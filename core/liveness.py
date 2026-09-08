@@ -55,8 +55,6 @@ class LivenessDetector:
         stds = np.std(pts_array, axis=0)
         mean_std = float(np.mean(stds))
 
-        # If completely frozen (< 0.15 pixel variance across frames), it's a static image
-        if mean_std < 0.12:
         # If completely static (e.g. fixed digital screenshot or still frame injection), variance < 0.04
         if mean_std < 0.04:
             return False, "Static Spoof Detected", mean_std

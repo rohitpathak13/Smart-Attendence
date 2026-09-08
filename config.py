@@ -22,18 +22,12 @@ SFACE_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_recogniti
 
 # Vision & Recognition Settings
 CAMERA_INDEX = 0
-CONFIDENCE_THRESHOLD = 0.85      # YuNet detection confidence score
-NMS_THRESHOLD = 0.3              # Non-Maximum Suppression threshold
-COSINE_SIMILARITY_THRESHOLD = 0.60  # SFace cosine similarity match threshold (> 0.60 is strong match)
-L2_DISTANCE_THRESHOLD = 1.15     # Norm-L2 distance threshold (< 1.15 is match)
 CONFIDENCE_THRESHOLD = 0.60         # YuNet detection score (official OpenCV default: 0.60)
 NMS_THRESHOLD = 0.3                 # Non-Maximum Suppression threshold
 COSINE_SIMILARITY_THRESHOLD = 0.363 # SFace cosine similarity match threshold (official OpenCV SFace standard: 0.363)
 L2_DISTANCE_THRESHOLD = 1.128       # Norm-L2 distance threshold (official: 1.128)
 
 # Attendance Rules
-COOLDOWN_MINUTES = 30            # Prevent recording same student within 30 minutes
-LATE_CUTOFF_TIME = "09:15:00"    # Attendance recorded after this time is marked LATE
 COOLDOWN_MINUTES = 5                # Prevent duplicate entries within 5 minutes
 LATE_CUTOFF_TIME = "09:15:00"       # Attendance recorded after this time is marked LATE
 

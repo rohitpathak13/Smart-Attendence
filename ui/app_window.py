@@ -337,7 +337,6 @@ class AttendanceApp:
             bg=PALETTE["surface_card"], hover_bg=PALETTE["surface_hover"],
             font=("Segoe UI", 9, "bold"), padx=10, pady=4
         )
-        btn_refresh.pack(side="right")
         btn_refresh.pack(side="right", padx=(6, 0))
 
         btn_reset = create_hover_button(
