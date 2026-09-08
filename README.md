@@ -1,181 +1,102 @@
-# Face Recognition Based Attendance Monitoring System
+# DeepVision: AI-Powered Smart Attendance Monitoring System
 
-A Python-based desktop application that automates attendance using facial recognition technology. The system captures student face images, trains an LBPH (Local Binary Pattern Histogram) face recognition model, and records attendance automatically through a webcam. Attendance records are stored in CSV format, providing an efficient and contactless alternative to manual attendance systems. The application includes a graphical user interface (GUI) built with Tkinter for easy interaction. The project performs face detection, image collection, model training, and attendance tracking. :contentReference[oaicite:0]{index=0} :contentReference[oaicite:1]{index=1}
-
----
-
-## Features
-
-- Student registration with unique ID and name
-- Face image capture using webcam
-- Face detection using Haar Cascade Classifier
-- Face recognition using LBPH Face Recognizer
-- Automatic attendance marking
-- Attendance stored in CSV files
-- Password protection for training the recognition model
-- User-friendly graphical interface built with Tkinter
-- Displays attendance records in real time
+An enterprise-grade, contactless attendance monitoring system powered by Deep Learning, OpenCV, SQLite, and a modern Tkinter desktop GUI. 
 
 ---
 
-## Technologies Used
+## 🚀 Key Improvements Over Legacy LBPH Systems
 
-- Python 3.x
-- OpenCV
-- Tkinter
-- NumPy
-- Pandas
-- Pillow (PIL)
+| Feature | Legacy System (Haar + LBPH) | DeepVision (Modern Architecture) |
+| :--- | :--- | :--- |
+| **Face Detection** | Haar Cascade Classifier (sensitive to angles & light) | **YuNet (ONNX Deep Neural Network)** |
+| **Face Recognition** | LBPH Recognizer (requires retraining every time) | **SFace (ArcFace 128-D Deep Feature Embeddings)** |
+| **Student Enrollment** | 100 raw images to disk + manual retraining | **Instant 1-click snapshot $\rightarrow$ 128-D vector saved to DB** |
+| **Anti-Spoofing** | None (vulnerable to printed photos & phone screens) | **Temporal Landmark Micro-Motion & Texture Analysis** |
+| **Data Storage** | Fragile CSV files & plaintext passwords | **ACID SQLite Database + Salted PBKDF2 Password Hashing** |
+| **Attendance Rules** | Buggy (only recorded last detected person) | **Automatic status (`PRESENT` / `LATE`), 30m duplicate cooldown** |
+| **User Interface** | Comic Sans, blocking external OpenCV popups | **Modern Dark UI with embedded 30 FPS camera feed** |
+| **Reporting** | Manual CSV checks | **Real-time KPI cards, date filtering, and 1-click CSV export** |
 
 ---
 
-## Project Structure
+## 📂 Project Architecture
 
 ```
-Face-Recognition-Based-Attendance-Monitoring-System/
+Andanced feature Attendance/
+├── config.py                 # Central configurations (thresholds, timings, paths)
+├── main.py                   # Clean application bootstrap entry point
+├── main_legacy.py            # Backup of original legacy script
+├── test_core.py              # Automated unit tests for DB, Vision & Liveness
+├── requirements.txt          # Minimal required dependencies
 │
-├── main.py
-├── haarcascade_frontalface_default.xml
-├── TrainingImage/
-├── TrainingImageLabel/
-├── StudentDetails/
-├── Attendance/
-└── README.md
+├── core/                     # Computer Vision & AI Pipeline
+│   ├── model_loader.py       # Auto-downloads official YuNet & SFace ONNX models
+│   ├── face_engine.py        # YuNet detection & SFace cosine similarity matching
+│   ├── liveness.py           # Anti-spoofing micro-motion & texture check
+│   └── video_capture.py      # Threaded non-blocking camera capture
+│
+├── database/                 # Persistent Storage & Security
+│   └── db_manager.py         # SQLite CRUD, PBKDF2 password hashing & CSV export
+│
+├── ui/                       # Modern Desktop Interface
+│   └── app_window.py         # Embedded video, KPI cards, Enrollment & Reports
+│
+├── models/                   # Auto-managed deep learning ONNX models
+├── data/                     # SQLite database (attendance_system.db)
+└── exports/                  # Exported attendance CSV files
 ```
 
 ---
 
-## Installation
+## 🛠️ Installation & Setup
 
-### 1. Clone the Repository
-
+### 1. Install Dependencies
+Make sure you have Python 3.8+ installed. Install the required libraries:
 ```bash
-git clone https://github.com/your-username/Face-Recognition-Based-Attendance-Monitoring-System.git
-cd Face-Recognition-Based-Attendance-Monitoring-System
+pip install -r requirements.txt
 ```
+*(Dependencies: `opencv-contrib-python`, `numpy`, `pandas`, `pillow`)*
 
-### 2. Install Required Libraries
-
-```bash
-pip install opencv-contrib-python
-pip install numpy
-pip install pandas
-pip install pillow
-```
-
-Or install all dependencies at once:
-
-```bash
-pip install opencv-contrib-python numpy pandas pillow
-```
-
----
-
-## How to Run
-
-Run the application using:
-
+### 2. Run the Application
+Launch the system with:
 ```bash
 python main.py
 ```
+> **Note:** On the first run, the application will automatically download the official OpenCV YuNet detector and SFace recognizer into the `models/` directory.
 
----
-
-## Working Procedure
-
-### Step 1: Register Student
-
-- Enter Student ID.
-- Enter Student Name.
-- Click **Take Images**.
-- Around 100 face images will be captured and saved.
-
-### Step 2: Train the Model
-
-- Click **Save Profile**.
-- Enter the training password if prompted.
-- The system trains the LBPH face recognition model.
-
-### Step 3: Mark Attendance
-
-- Click **Take Attendance**.
-- The webcam detects and recognizes registered faces.
-- Attendance is automatically recorded with:
-  - Student ID
-  - Student Name
-  - Date
-  - Time
-
----
-
-## Output
-
-Attendance files are generated automatically inside the **Attendance** folder.
-
-Example:
-
-```
-Attendance/
-└── Attendance_25-07-2026.csv
-```
-
-Student details are stored in:
-
-```
-StudentDetails/
-└── StudentDetails.csv
-```
-
-The trained recognition model is saved in:
-
-```
-TrainingImageLabel/
-└── Trainner.yml
+### 3. Run Automated Tests
+You can verify the database, face matching algorithms, and liveness detector at any time:
+```bash
+python test_core.py
 ```
 
 ---
 
-## Dependencies
+## 📖 How to Use
 
-- OpenCV (opencv-contrib-python)
-- NumPy
-- Pandas
-- Pillow
-- Tkinter (Included with Python)
+### 1. Instant Student Enrollment
+1. Open the application and switch to the **"Enroll Student"** tab on the right.
+2. Enter the **Roll ID** (e.g., `CS101`), **Name**, and optional Department / Email.
+3. Position the student in front of the camera.
+4. Click **"📸 Capture & Enroll Face"**.
+5. The system extracts the 128-dimensional ArcFace vector and stores it in the database immediately. **No retraining needed!**
 
----
+### 2. Automatic Real-Time Attendance
+1. Switch to the **"Live Attendance"** tab.
+2. When an enrolled student approaches the camera:
+   - A **green bounding box** with the student's name and confidence percentage appears.
+   - The anti-spoofing engine verifies liveness.
+   - Attendance is instantly recorded in the database and displayed in the live table.
+   - If attendance is recorded after `09:15:00`, it is automatically tagged as **`LATE`**.
+   - A **30-minute cooldown** prevents duplicate marks.
 
-## Future Enhancements
+### 3. Reports & CSV Export
+1. Switch to the **"Reports & Export"** tab.
+2. Pick any date (defaults to today) and click **"Load Records"**.
+3. Click **"📥 Export CSV"** to save a clean attendance sheet to the `exports/` folder or your preferred location.
 
-- MySQL/Firebase database integration
-- Deep learning-based face recognition
-- Web-based attendance portal
-- Email and SMS notifications
-- QR Code attendance support
-- Cloud storage integration
-- Multi-camera support
-- Attendance analytics dashboard
-
----
-
-## License
-
-This project is intended for educational and academic purposes.
-
----
-
-## Acknowledgements
-
-- OpenCV Documentation
-- Python Documentation
-- NumPy Documentation
-- Pandas Documentation
-- Pillow Documentation
-
----
-
-## Author
-
-**Face Recognition Based Attendance Monitoring System**
-
-Developed using **Python**, **OpenCV**, and **Tkinter** for automated attendance management.
+### 4. Settings & Security
+- Default Administrator Credentials:
+  - **Username:** `admin`
+  - **Password:** `admin123`
+- Change admin passwords and manage student records from the **"Settings"** tab.
