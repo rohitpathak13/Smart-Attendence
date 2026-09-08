@@ -1,0 +1,22 @@
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+venv/
+env/
+
+# SQLite Database & Exported logs
+data/*.db
+exports/*.csv
+
+# Large ONNX Model Binaries (auto-downloaded on first run)
+models/*.onnx
+models/*.download
+
+# IDE / Editor folders
+.vscode/
+.idea/
+
