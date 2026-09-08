@@ -338,6 +338,14 @@ class AttendanceApp:
             font=("Segoe UI", 9, "bold"), padx=10, pady=4
         )
         btn_refresh.pack(side="right")
+        btn_refresh.pack(side="right", padx=(6, 0))
+
+        btn_reset = create_hover_button(
+            table_hdr, text="🧹 Clear Today (Test Again)", command=self._reset_today_records,
+            bg=PALETTE["surface_card"], hover_bg=PALETTE["danger"],
+            font=("Segoe UI", 9, "bold"), padx=10, pady=4
+        )
+        btn_reset.pack(side="right")
 
         # Treeview Table
         table_box = tk.Frame(parent, bg=PALETTE["surface"])
@@ -418,6 +426,12 @@ class AttendanceApp:
         self.stat_present_val.config(text=str(stats["present_today"]))
         self.stat_late_val.config(text=str(stats["late_today"]))
         self.stat_absent_val.config(text=str(stats["absent_today"]))
+
+    def _reset_today_records(self):
+        if messagebox.askyesno("Reset Today's Attendance", "Clear today's attendance records so you can test taking attendance again?"):
+            cleared = self.db.clear_today_attendance()
+            self.refresh_today_attendance()
+            self._show_banner(f"🧹 Cleared {cleared} attendance record(s) for today (Ready to test)", PALETTE["secondary"])
 
     # --- TAB 2: Student Enrollment ---
     def _build_enrollment_tab(self):
@@ -774,6 +788,9 @@ class AttendanceApp:
                             if marked and info:
                                 self.refresh_today_attendance()
                                 self._show_banner(f"✓ Marked: {student_name} [{info['status']}]", PALETTE["success"])
+                            elif "Cooldown" in reason:
+                                label_text = f"{student_name} [ALREADY MARKED]"
+                                self._show_banner(f"ℹ️ {student_name} is already recorded Present today ({reason})", PALETTE["secondary"])
                         else:
                             box_color = (94, 63, 244)  # Crimson Spoof (BGR)
                             label_text = f"{student_name} [SPOOF REJECT]"

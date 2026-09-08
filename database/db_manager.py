@@ -272,6 +272,15 @@ class DatabaseManager:
                 "absent_today": max(0, total_students - present_today)
             }
 
+    def clear_today_attendance(self) -> int:
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM attendance WHERE date = ?", (today_str,))
+            count = cursor.rowcount
+            conn.commit()
+            return count
+
     # --- Export Utilities ---
     def export_attendance_csv(self, date_str: str, file_path: str) -> Tuple[bool, str]:
         records = self.get_attendance_by_date(date_str)
