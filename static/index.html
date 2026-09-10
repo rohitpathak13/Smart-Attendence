@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DeepVision AI - Enterprise Contactless Facial Recognition Attendance Monitoring System">
+  <title>⚡ DeepVision AI — Smart Face Attendance System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-badge">
+        <span class="pulse-dot"></span>
+        <span class="brand-icon">⚡</span>
+      </div>
+      <div>
+        <h1 class="brand-title">DeepVision <span class="brand-accent">AI</span></h1>
+        <p class="brand-subtitle">Contactless Face Attendance System • Cloud Edition</p>
+      </div>
+    </div>
+
+    <!-- Live Status Indicator -->
+    <div class="header-status">
+      <div class="status-pill" id="system-status-pill">
+        <span class="status-dot"></span>
+        <span id="system-status-text">Connecting...</span>
+      </div>
+      <div class="clock-pill" id="live-clock">--:--:--</div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="header-nav">
+      <button class="nav-tab active" data-tab="attendance-tab" id="nav-attendance">
+        <span class="tab-icon">📷</span> Live Attendance
+      </button>
+      <button class="nav-tab" data-tab="enroll-tab" id="nav-enroll">
+        <span class="tab-icon">👤</span> Enroll Student
+      </button>
+      <button class="nav-tab" data-tab="reports-tab" id="nav-reports">
+        <span class="tab-icon">📊</span> Reports & Export
+      </button>
+      <button class="nav-tab" data-tab="directory-tab" id="nav-directory">
+        <span class="tab-icon">🗂️</span> Directory
+      </button>
+      <button class="nav-tab" data-tab="settings-tab" id="nav-settings">
+        <span class="tab-icon">⚙️</span> Settings
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- TAB 1: LIVE ATTENDANCE -->
+    <section id="attendance-tab" class="tab-content active">
+      <!-- KPI Stats Grid -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon icon-cyan">👥</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Total Students</span>
+            <span class="kpi-value" id="kpi-total">0</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-emerald">✓</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Present Today</span>
+            <span class="kpi-value" id="kpi-present">0</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-amber">⏱️</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Late Today</span>
+            <span class="kpi-value" id="kpi-late">0</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-rose">✕</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Absent Today</span>
+            <span class="kpi-value" id="kpi-absent">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Live Monitor Workspace -->
+      <div class="attendance-workspace">
+        <!-- Left: Camera Feed & Real-Time Canvas HUD -->
+        <div class="camera-card">
+          <div class="card-header">
+            <div class="header-left">
+              <span class="card-title">Live Vision Stream</span>
+              <span class="card-tag">YuNet + ArcFace</span>
+            </div>
+            <div class="camera-controls">
+              <button id="btn-camera-toggle" class="btn btn-primary">
+                <span class="btn-icon">▶</span> Start Camera
+              </button>
+              <button id="btn-camera-flip" class="btn btn-ghost" title="Flip camera">🔄</button>
+            </div>
+          </div>
+
+          <div class="video-wrapper">
+            <video id="webcam" playsinline autoplay muted></video>
+            <canvas id="hud-canvas"></canvas>
+            <div id="camera-overlay" class="camera-overlay">
+              <div class="overlay-graphic">📷</div>
+              <p>Camera is currently idle</p>
+              <button id="btn-camera-start-overlay" class="btn btn-primary">Start Live Feed</button>
+            </div>
+            <!-- HUD Scanline overlay -->
+            <div class="hud-scanline"></div>
+          </div>
+
+          <!-- Bottom Stream Stats & Tips -->
+          <div class="camera-footer">
+            <div class="stream-metric">
+              <span class="metric-label">FPS:</span>
+              <span class="metric-val" id="stream-fps">0</span>
+            </div>
+            <div class="stream-metric">
+              <span class="metric-label">Engine:</span>
+              <span class="metric-val text-cyan">YuNet (ONNX)</span>
+            </div>
+            <div class="stream-metric">
+              <span class="metric-label">Liveness:</span>
+              <span class="metric-val text-emerald" id="liveness-status">Active</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Real-time Attendance Feed -->
+        <div class="feed-card">
+          <div class="card-header">
+            <span class="card-title">Today's Live Attendance Feed</span>
+            <button id="btn-refresh-feed" class="btn btn-ghost btn-sm">↻ Refresh</button>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="today-table">
+              <thead>
+                <tr>
+                  <th>Roll No</th>
+                  <th>Name</th>
+                  <th>Time</th>
+                  <th>Status</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="today-table-body">
+                <tr class="empty-row">
+                  <td colspan="5">No attendance marked yet today.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ENROLL STUDENT -->
+    <section id="enroll-tab" class="tab-content">
+      <div class="enroll-grid">
+        <!-- Form Section -->
+        <div class="card enroll-form-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Enroll New Student</h2>
+              <p class="card-sub">Extracts a 128-D ArcFace vector & saves to SQLite</p>
+            </div>
+          </div>
+
+          <form id="enroll-form" class="form-layout">
+            <div class="form-group">
+              <label for="enroll-roll">Roll ID / Student ID *</label>
+              <input type="text" id="enroll-roll" placeholder="e.g. CS101" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="enroll-name">Full Name *</label>
+              <input type="text" id="enroll-name" placeholder="e.g. Alice Smith" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="enroll-dept">Department</label>
+              <input type="text" id="enroll-dept" placeholder="e.g. Computer Science" value="General">
+            </div>
+
+            <div class="form-group">
+              <label for="enroll-email">Email Address</label>
+              <input type="email" id="enroll-email" placeholder="e.g. student@university.edu">
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-submit-enroll" class="btn btn-primary btn-block">
+                💾 Register Student & Face
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Face Capture & Preview Section -->
+        <div class="card enroll-capture-card">
+          <div class="card-header">
+            <span class="card-title">Face Snapshot</span>
+            <span class="card-tag">Required</span>
+          </div>
+
+          <div class="capture-box">
+            <div class="preview-stage">
+              <video id="enroll-video" autoplay playsinline muted></video>
+              <canvas id="enroll-canvas" style="display:none;"></canvas>
+              <img id="enroll-preview-img" alt="Captured Face" style="display:none;">
+              <div id="enroll-placeholder" class="enroll-placeholder">
+                <span>📸</span>
+                <p>Position face squarely in frame</p>
+              </div>
+            </div>
+
+            <div class="capture-actions">
+              <button type="button" id="btn-enroll-cam-toggle" class="btn btn-secondary">
+                Turn On Camera
+              </button>
+              <button type="button" id="btn-enroll-snap" class="btn btn-primary" disabled>
+                📸 Snap Photo
+              </button>
+              <label class="btn btn-ghost file-input-label">
+                📁 Upload Photo
+                <input type="file" id="enroll-file-input" accept="image/*" style="display:none;">
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: REPORTS & CSV EXPORT -->
+    <section id="reports-tab" class="tab-content">
+      <div class="card reports-card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Attendance Reports & Logs</h2>
+            <p class="card-sub">Filter records by date and export clean audit sheets</p>
+          </div>
+
+          <div class="reports-controls">
+            <input type="date" id="report-date-picker" class="input-date">
+            <button id="btn-load-report" class="btn btn-secondary">🔍 Load Records</button>
+            <button id="btn-export-csv" class="btn btn-primary">📥 Export CSV</button>
+          </div>
+        </div>
+
+        <div class="table-container report-table-wrap">
+          <table class="data-table" id="report-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="report-table-body">
+              <tr class="empty-row">
+                <td colspan="8">Select a date and click 'Load Records'.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: STUDENT DIRECTORY -->
+    <section id="directory-tab" class="tab-content">
+      <div class="card directory-card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Registered Students Directory</h2>
+            <p class="card-sub">Active facial profiles with ArcFace embeddings</p>
+          </div>
+          <div class="directory-search-wrap">
+            <input type="text" id="directory-search" class="input-search" placeholder="Search by name or roll number...">
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="directory-table">
+            <thead>
+              <tr>
+                <th>Roll No</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Email</th>
+                <th>Enrolled Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="directory-table-body">
+              <tr class="empty-row">
+                <td colspan="6">Loading enrolled students...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: SETTINGS & SYSTEM STATUS -->
+    <section id="settings-tab" class="tab-content">
+      <div class="settings-grid">
+        <!-- System Health & Config Info -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">System & Cloud Diagnostics</h2>
+          </div>
+          <div class="diagnostics-list">
+            <div class="diag-item">
+              <span class="diag-label">Cloud Deployment:</span>
+              <span class="diag-val text-cyan">Railway (Docker / Headless)</span>
+            </div>
+            <div class="diag-item">
+              <span class="diag-label">Face Detector:</span>
+              <span class="diag-val text-emerald">OpenCV YuNet (ONNX)</span>
+            </div>
+            <div class="diag-item">
+              <span class="diag-label">Face Recognizer:</span>
+              <span class="diag-val text-emerald">OpenCV SFace (128-D ArcFace)</span>
+            </div>
+            <div class="diag-item">
+              <span class="diag-label">Duplicate Cooldown:</span>
+              <span class="diag-val" id="diag-cooldown">5 Minutes</span>
+            </div>
+            <div class="diag-item">
+              <span class="diag-label">Late Cutoff Time:</span>
+              <span class="diag-val text-amber" id="diag-late-cutoff">09:15:00</span>
+            </div>
+            <div class="diag-item">
+              <span class="diag-label">Database Storage:</span>
+              <span class="diag-val">SQLite (Persistent Volume)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Password Form -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Admin Security Settings</h2>
+          </div>
+          <form id="admin-password-form" class="form-layout">
+            <div class="form-group">
+              <label for="admin-user">Admin Username</label>
+              <input type="text" id="admin-user" value="admin" required>
+            </div>
+            <div class="form-group">
+              <label for="admin-old-pass">Current Password</label>
+              <input type="password" id="admin-old-pass" placeholder="••••••••" required>
+            </div>
+            <div class="form-group">
+              <label for="admin-new-pass">New Password</label>
+              <input type="password" id="admin-new-pass" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Password</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

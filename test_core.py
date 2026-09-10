@@ -60,7 +60,9 @@ class TestAttendanceSystemCore(unittest.TestCase):
         # Test stats
         stats = self.db.get_today_stats()
         self.assertEqual(stats["total_students"], 1)
-        self.assertEqual(stats["present_today"] + stats["late_today"], 1)
+        self.assertEqual(stats["present_today"], 1)
+        self.assertEqual(stats["absent_today"], 0)
+
 
     def test_face_engine_matching(self):
         engine = FaceEngine(YUNET_MODEL_PATH, SFACE_MODEL_PATH)

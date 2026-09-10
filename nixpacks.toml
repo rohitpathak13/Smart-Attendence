@@ -1,0 +1,12 @@
+# Nixpacks configuration for Railway deployment (if Nixpacks builder is selected)
+[phases.setup]
+aptPkgs = ["libgl1", "libglib2.0-0", "curl"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["python -c 'from core.model_loader import ensure_models_exist; ensure_models_exist()'"]
+
+[start]
+cmd = "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000}"

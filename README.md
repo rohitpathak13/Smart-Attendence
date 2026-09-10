@@ -58,13 +58,26 @@ pip install -r requirements.txt
 *(Dependencies: `opencv-contrib-python`, `numpy`, `pandas`, `pillow`)*
 
 ### 2. Run the Application
-Launch the system with:
+
+#### Option A: Cloud Web Server & Browser Dashboard (Railway Ready)
+Launch the FastAPI cloud web server:
+```bash
+python server.py
+```
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+#### Option B: Desktop Tkinter GUI
+Launch the desktop native interface:
 ```bash
 python main.py
 ```
 > **Note:** On the first run, the application will automatically download the official OpenCV YuNet detector and SFace recognizer into the `models/` directory.
 
-### 3. Run Automated Tests
+### 3. Deploy to Railway (Cloud)
+To deploy this project to [Railway](https://railway.app/) in 1-click with zero-setup Docker & Persistent Volume, read the complete guide in [RAILWAY.md](RAILWAY.md).
+
+### 4. Run Automated Tests
+
 You can verify the database, face matching algorithms, and liveness detector at any time:
 ```bash
 python test_core.py
