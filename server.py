@@ -279,23 +279,11 @@ def enroll_student(payload: EnrollStudentRequest):
 
 @app.get("/api/students")
 def get_students():
-    """Returns all enrolled students (metadata only, omitting binary vectors)"""
+    """Returns all enrolled students with monthly active days attendance statistics"""
     if db is None:
         raise HTTPException(status_code=503, detail="Database not ready")
-    students = db.get_all_students()
-    # Strip raw embedding from JSON response
-    sanitized = [
-        {
-            "id": s["id"],
-            "roll_no": s["roll_no"],
-            "name": s["name"],
-            "department": s["department"],
-            "email": s["email"],
-            "created_at": s["created_at"]
-        }
-        for s in students
-    ]
-    return {"students": sanitized, "count": len(sanitized)}
+    students = db.get_students_directory()
+    return {"students": students, "count": len(students)}
 
 @app.delete("/api/students/{roll_no}")
 def delete_student(roll_no: str):

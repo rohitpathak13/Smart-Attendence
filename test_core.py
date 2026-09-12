@@ -62,6 +62,15 @@ class TestAttendanceSystemCore(unittest.TestCase):
         self.assertEqual(stats["total_students"], 1)
         self.assertEqual(stats["present_today"], 1)
         self.assertEqual(stats["absent_today"], 0)
+        self.assertEqual(stats["active_days_month"], 1)
+        self.assertEqual(stats["monthly_percentage"], 100.0)
+
+        # Test directory with monthly stats
+        directory = self.db.get_students_directory()
+        self.assertEqual(len(directory), 1)
+        self.assertEqual(directory[0]["active_days_present"], 1)
+        self.assertEqual(directory[0]["total_active_days"], 1)
+        self.assertEqual(directory[0]["monthly_percentage"], 100.0)
 
 
     def test_face_engine_matching(self):

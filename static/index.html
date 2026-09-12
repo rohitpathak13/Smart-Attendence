@@ -91,6 +91,14 @@
             <span class="kpi-value" id="kpi-absent">0</span>
           </div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-indigo">🗓️</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Month Active Days</span>
+            <span class="kpi-value" id="kpi-month-pct">0%</span>
+            <span class="kpi-sublabel" id="kpi-month-days">0 Active Days</span>
+          </div>
+        </div>
       </div>
 
       <!-- Main Live Monitor Workspace -->
@@ -154,12 +162,13 @@
                   <th>Name</th>
                   <th>Time</th>
                   <th>Status</th>
+                  <th>Month Att.</th>
                   <th>Confidence</th>
                 </tr>
               </thead>
               <tbody id="today-table-body">
                 <tr class="empty-row">
-                  <td colspan="5">No attendance marked yet today.</td>
+                  <td colspan="6">No attendance marked yet today.</td>
                 </tr>
               </tbody>
             </table>
@@ -304,6 +313,7 @@
                 <th>Roll No</th>
                 <th>Name</th>
                 <th>Department</th>
+                <th>Month Att. (Active Days)</th>
                 <th>Email</th>
                 <th>Enrolled Date</th>
                 <th>Actions</th>
@@ -311,7 +321,7 @@
             </thead>
             <tbody id="directory-table-body">
               <tr class="empty-row">
-                <td colspan="6">Loading enrolled students...</td>
+                <td colspan="7">Loading enrolled students...</td>
               </tr>
             </tbody>
           </table>

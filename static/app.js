@@ -30,6 +30,8 @@ const el = {
   kpiPresent: document.getElementById("kpi-present"),
   kpiLate: document.getElementById("kpi-late"),
   kpiAbsent: document.getElementById("kpi-absent"),
+  kpiMonthPct: document.getElementById("kpi-month-pct"),
+  kpiMonthDays: document.getElementById("kpi-month-days"),
 
   // Live Camera & HUD
   webcam: document.getElementById("webcam"),
@@ -199,6 +201,7 @@ async function startCamera() {
 
     state.stream = await navigator.mediaDevices.getUserMedia(constraints);
     el.webcam.srcObject = state.stream;
+    el.webcam.style.transform = state.facingMode === "user" ? "scaleX(-1)" : "none";
     await el.webcam.play();
 
     state.isStreaming = true;
@@ -245,6 +248,7 @@ function stopCamera() {
 // Flip Camera (Mobile User vs Environment)
 async function flipCamera() {
   state.facingMode = state.facingMode === "user" ? "environment" : "user";
+  el.webcam.style.transform = state.facingMode === "user" ? "scaleX(-1)" : "none";
   if (state.isStreaming) {
     stopCamera();
     await startCamera();
@@ -307,10 +311,19 @@ function drawHUD(faces) {
 
   if (!faces || faces.length === 0) return;
 
+  // Mirror X coordinates when front selfie camera preview is mirrored
+  const isMirrored = state.facingMode === "user";
+
   faces.forEach((face) => {
     const [x, y, w, h] = face.bbox;
     const isRecognized = face.is_recognized;
     const isLive = face.liveness.is_live;
+
+    // Calculate screen coordinates to precisely match the video preview
+    const bx = isMirrored ? (canvas.width - (x + w)) : x;
+    const by = y;
+    const bw = w;
+    const bh = h;
 
     let primaryColor = "#06b6d4"; // Cyan: Scanning / Unknown
     if (isRecognized && isLive) primaryColor = "#10b981"; // Emerald: Verified Student
@@ -320,64 +333,84 @@ function drawHUD(faces) {
     ctx.lineWidth = 2.5;
 
     // Corner bracket styles
-    const cornerLen = Math.min(w, h) * 0.25;
+    const cornerLen = Math.min(bw, bh) * 0.25;
 
     // Top-Left
     ctx.beginPath();
-    ctx.moveTo(x, y + cornerLen);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x + cornerLen, y);
+    ctx.moveTo(bx, by + cornerLen);
+    ctx.lineTo(bx, by);
+    ctx.lineTo(bx + cornerLen, by);
     ctx.stroke();
 
     // Top-Right
     ctx.beginPath();
-    ctx.moveTo(x + w - cornerLen, y);
-    ctx.lineTo(x + w, y);
-    ctx.lineTo(x + w, y + cornerLen);
+    ctx.moveTo(bx + bw - cornerLen, by);
+    ctx.lineTo(bx + bw, by);
+    ctx.lineTo(bx + bw, by + cornerLen);
     ctx.stroke();
 
     // Bottom-Left
     ctx.beginPath();
-    ctx.moveTo(x, y + h - cornerLen);
-    ctx.lineTo(x, y + h);
-    ctx.lineTo(x + cornerLen, y + h);
+    ctx.moveTo(bx, by + bh - cornerLen);
+    ctx.lineTo(bx, by + bh);
+    ctx.lineTo(bx + cornerLen, by + bh);
     ctx.stroke();
 
     // Bottom-Right
     ctx.beginPath();
-    ctx.moveTo(x + w - cornerLen, y + h);
-    ctx.lineTo(x + w, y + h);
-    ctx.lineTo(x + w, y + h - cornerLen);
+    ctx.moveTo(bx + bw - cornerLen, by + bh);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.lineTo(bx + bw, by + bh - cornerLen);
     ctx.stroke();
 
     // Subtle face box fill
     ctx.fillStyle = `${primaryColor}15`;
-    ctx.fillRect(x, y, w, h);
+    ctx.fillRect(bx, by, bw, bh);
 
     // Draw facial landmark dots
     if (face.landmarks) {
       ctx.fillStyle = primaryColor;
       for (const ptName in face.landmarks) {
-        const [lx, ly] = face.landmarks[ptName];
+        const [rawLx, ly] = face.landmarks[ptName];
+        const lx = isMirrored ? (canvas.width - rawLx) : rawLx;
         ctx.beginPath();
         ctx.arc(lx, ly, 3, 0, 2 * Math.PI);
         ctx.fill();
       }
     }
 
-    // Label banner
-    const label = isRecognized
-      ? `${face.student.name} (${Math.round(face.match_confidence * 100)}%)`
-      : isLive ? "Scanning..." : "⚠️ Spoof Detected";
+    // Clearly format student details: Roll No + Name + Match %
+    let label;
+    if (isRecognized && face.student) {
+      const roll = face.student.roll_no ? `${face.student.roll_no} • ` : "";
+      const conf = Math.round(face.match_confidence * 100);
+      label = `${roll}${face.student.name} (${conf}%)`;
+    } else {
+      label = isLive ? "Scanning..." : "⚠️ Spoof Detected";
+    }
 
     ctx.font = "bold 13px 'JetBrains Mono', monospace";
-    const textWidth = ctx.measureText(label).width;
+    const textMetrics = ctx.measureText(label);
+    const textWidth = textMetrics.width;
+    const bannerH = 22;
+    const bannerW = textWidth + 14;
+    const bannerY = by > 26 ? by - bannerH - 2 : by + bh + 4;
+    let bannerX = bx;
+    if (bannerX + bannerW > canvas.width) bannerX = canvas.width - bannerW - 2;
+    if (bannerX < 2) bannerX = 2;
 
-    ctx.fillStyle = `${primaryColor}cc`;
-    ctx.fillRect(x, y > 24 ? y - 22 : y + h, textWidth + 14, 20);
+    ctx.fillStyle = `${primaryColor}e6`;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 4);
+      ctx.fill();
+    } else {
+      ctx.fillRect(bannerX, bannerY, bannerW, bannerH);
+    }
 
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(label, x + 7, y > 24 ? y - 7 : y + h + 14);
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, bannerX + 7, bannerY + (bannerH / 2));
   });
 }
 
@@ -414,12 +447,19 @@ async function fetchTodayAttendance() {
     el.kpiPresent.textContent = data.stats.present_today || 0;
     el.kpiLate.textContent = data.stats.late_today || 0;
     el.kpiAbsent.textContent = data.stats.absent_today || 0;
+    if (el.kpiMonthPct) {
+      el.kpiMonthPct.textContent = (data.stats.monthly_percentage || 0) + "%";
+    }
+    if (el.kpiMonthDays) {
+      const days = data.stats.active_days_month || 0;
+      el.kpiMonthDays.textContent = `${days} Active Day${days === 1 ? "" : "s"}`;
+    }
 
     // Populate Table
     if (!data.records || data.records.length === 0) {
       el.todayTableBody.innerHTML = `
         <tr class="empty-row">
-          <td colspan="5">No attendance marked yet today.</td>
+          <td colspan="6">No attendance marked yet today.</td>
         </tr>
       `;
       return;
@@ -435,6 +475,10 @@ async function fetchTodayAttendance() {
             <span class="badge ${r.status === 'LATE' ? 'badge-late' : 'badge-present'}">
               ${r.status}
             </span>
+          </td>
+          <td>
+            <span class="badge-month">${r.monthly_percentage || 0}%</span>
+            <small class="text-muted" style="font-size:0.72rem;margin-left:3px;">(${r.month_present_days || 0}/${r.active_days_month || 0}d)</small>
           </td>
           <td><span class="badge-confidence">${Math.round(r.confidence * 100)}%</span></td>
         </tr>
@@ -636,7 +680,7 @@ async function fetchDirectory() {
 function renderDirectory(students) {
   if (!students || students.length === 0) {
     el.directoryTableBody.innerHTML = `
-      <tr class="empty-row"><td colspan="6">No registered students found.</td></tr>
+      <tr class="empty-row"><td colspan="7">No registered students found.</td></tr>
     `;
     return;
   }
@@ -647,6 +691,10 @@ function renderDirectory(students) {
         <td><strong class="text-cyan">${s.roll_no}</strong></td>
         <td>${s.name}</td>
         <td>${s.department || "General"}</td>
+        <td>
+          <span class="badge-month">${s.monthly_percentage || 0}%</span>
+          <small class="text-muted" style="font-size:0.75rem;margin-left:4px;">(${s.active_days_present || 0}/${s.total_active_days || 0} active days)</small>
+        </td>
         <td>${s.email || "—"}</td>
         <td>${s.created_at || "—"}</td>
         <td>

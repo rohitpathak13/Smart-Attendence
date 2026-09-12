@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 class DatabaseManager:
     def __init__(self, db_path: str):
@@ -161,6 +161,42 @@ class DatabaseManager:
                 })
             return students
 
+    def get_students_directory(self) -> List[Dict]:
+        month_str = datetime.now().strftime("%Y-%m")
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT date) FROM attendance WHERE date LIKE ?", (f"{month_str}%",))
+            active_days_month = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT s.id, s.roll_no, s.name, s.department, s.email, s.created_at,
+                       COUNT(DISTINCT a.date) as active_days_present
+                FROM students s
+                LEFT JOIN attendance a ON s.id = a.student_id AND a.date LIKE ?
+                GROUP BY s.id
+                ORDER BY s.roll_no
+                """,
+                (f"{month_str}%",)
+            )
+            rows = cursor.fetchall()
+            students = []
+            for row in rows:
+                present_days = row["active_days_present"] or 0
+                pct = round((present_days / active_days_month) * 100, 1) if active_days_month > 0 else 0.0
+                students.append({
+                    "id": row["id"],
+                    "roll_no": row["roll_no"],
+                    "name": row["name"],
+                    "department": row["department"],
+                    "email": row["email"],
+                    "created_at": row["created_at"],
+                    "active_days_present": present_days,
+                    "total_active_days": active_days_month,
+                    "monthly_percentage": pct
+                })
+            return students
+
     def get_student_count(self) -> int:
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -234,26 +270,40 @@ class DatabaseManager:
             }
 
     def get_attendance_by_date(self, date_str: str) -> List[Dict]:
+        month_str = date_str[:7]
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT date) FROM attendance WHERE date LIKE ?", (f"{month_str}%",))
+            active_days_month = cursor.fetchone()[0]
+
             cursor.execute(
                 """
-                SELECT a.id, s.roll_no, s.name, s.department, a.date, a.time, a.status, a.confidence
+                SELECT a.id, s.roll_no, s.name, s.department, a.date, a.time, a.status, a.confidence,
+                       (SELECT COUNT(DISTINCT a2.date) FROM attendance a2 WHERE a2.student_id = s.id AND a2.date LIKE ?) as month_present_days
                 FROM attendance a
                 JOIN students s ON a.student_id = s.id
                 WHERE a.date = ?
                 ORDER BY a.id DESC
                 """,
-                (date_str,)
+                (f"{month_str}%", date_str)
             )
-            return [dict(row) for row in cursor.fetchall()]
+            records = []
+            for row in cursor.fetchall():
+                r = dict(row)
+                present_days = r.get("month_present_days", 0) or 0
+                r["active_days_month"] = active_days_month
+                r["month_present_days"] = present_days
+                r["monthly_percentage"] = round((present_days / active_days_month) * 100, 1) if active_days_month > 0 else 0.0
+                records.append(r)
+            return records
 
     def get_today_attendance(self) -> List[Dict]:
         today_str = datetime.now().strftime("%Y-%m-%d")
         return self.get_attendance_by_date(today_str)
 
-    def get_today_stats(self) -> Dict[str, int]:
+    def get_today_stats(self) -> Dict[str, Any]:
         today_str = datetime.now().strftime("%Y-%m-%d")
+        month_str = datetime.now().strftime("%Y-%m")
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(DISTINCT student_id) FROM attendance WHERE date = ?", (today_str,))
@@ -265,11 +315,27 @@ class DatabaseManager:
             cursor.execute("SELECT COUNT(*) FROM students")
             total_students = cursor.fetchone()[0]
 
+            # Active days in current month (unique dates on which attendance was recorded)
+            cursor.execute("SELECT COUNT(DISTINCT date) FROM attendance WHERE date LIKE ?", (f"{month_str}%",))
+            active_days_month = cursor.fetchone()[0]
+
+            # Total student-days attended this month
+            cursor.execute("SELECT COUNT(DISTINCT student_id || '_' || date) FROM attendance WHERE date LIKE ?", (f"{month_str}%",))
+            month_attendances = cursor.fetchone()[0]
+
+            if active_days_month > 0 and total_students > 0:
+                possible_attendances = total_students * active_days_month
+                monthly_percentage = round((month_attendances / possible_attendances) * 100, 1)
+            else:
+                monthly_percentage = 0.0
+
             return {
                 "total_students": total_students,
                 "present_today": present_today,
                 "late_today": late_today,
-                "absent_today": max(0, total_students - present_today)
+                "absent_today": max(0, total_students - present_today),
+                "active_days_month": active_days_month,
+                "monthly_percentage": monthly_percentage
             }
 
     def clear_today_attendance(self) -> int:

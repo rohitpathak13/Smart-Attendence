@@ -34,6 +34,7 @@ L2_DISTANCE_THRESHOLD = float(os.environ.get("L2_DISTANCE_THRESHOLD", 1.128))   
 # Attendance Rules
 COOLDOWN_MINUTES = int(os.environ.get("COOLDOWN_MINUTES", 5))                       # Prevent duplicate entries within N minutes
 LATE_CUTOFF_TIME = os.environ.get("LATE_CUTOFF_TIME", "09:15:00")                   # Attendance recorded after this time is marked LATE
+LIVENESS_TEXTURE_THRESHOLD = float(os.environ.get("LIVENESS_TEXTURE_THRESHOLD", 20.0)) # Anti-spoof Laplacian sharpness threshold
 
 # Security & Default Admin
 DEFAULT_ADMIN_USER = os.environ.get("DEFAULT_ADMIN_USER", "admin")
