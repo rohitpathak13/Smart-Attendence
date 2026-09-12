@@ -145,6 +145,7 @@ body {
 .brand-accent {
   background: linear-gradient(90deg, var(--secondary), var(--primary-hover));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
