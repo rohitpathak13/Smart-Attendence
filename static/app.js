@@ -210,10 +210,14 @@ async function startCamera() {
     el.btnCameraToggle.classList.replace("btn-primary", "btn-ghost");
 
     // Adjust Canvas HUD resolution to match video
-    el.webcam.onloadedmetadata = () => {
-      el.hudCanvas.width = el.webcam.videoWidth || 640;
-      el.hudCanvas.height = el.webcam.videoHeight || 480;
+    const syncCanvasSize = () => {
+      if (el.webcam.videoWidth && el.webcam.videoHeight) {
+        el.hudCanvas.width = el.webcam.videoWidth;
+        el.hudCanvas.height = el.webcam.videoHeight;
+      }
     };
+    syncCanvasSize();
+    el.webcam.addEventListener("loadedmetadata", syncCanvasSize);
 
     // Begin real-time recognition frame capture loop (~5-6 FPS for optimal cloud responsiveness)
     clearInterval(state.captureInterval);
@@ -306,6 +310,15 @@ async function captureAndRecognize() {
 // Draw Cyberpunk HUD bounding box overlay on Canvas
 function drawHUD(faces) {
   const canvas = el.hudCanvas;
+
+  // Guarantee canvas internal resolution matches webcam video dimensions
+  if (el.webcam.videoWidth && el.webcam.videoHeight) {
+    if (canvas.width !== el.webcam.videoWidth || canvas.height !== el.webcam.videoHeight) {
+      canvas.width = el.webcam.videoWidth;
+      canvas.height = el.webcam.videoHeight;
+    }
+  }
+
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
