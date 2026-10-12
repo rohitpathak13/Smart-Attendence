@@ -25,7 +25,6 @@ An enterprise-grade, contactless attendance monitoring system powered by Deep Le
 Andanced feature Attendance/
 ├── config.py                 # Central configurations (thresholds, timings, paths)
 ├── main.py                   # Clean application bootstrap entry point
-├── main_legacy.py            # Backup of original legacy script
 ├── test_core.py              # Automated unit tests for DB, Vision & Liveness
 ├── requirements.txt          # Minimal required dependencies
 │

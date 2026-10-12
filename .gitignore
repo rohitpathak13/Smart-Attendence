@@ -16,6 +16,18 @@ exports/*.csv
 models/*.onnx
 models/*.download
 
+# Sensitive credential files & shortcuts
+psd.txt
+*.lnk
+psd.txt.lnk
+TrainingImageLabel/psd.txt
+*.env
+!*.env.example
+
+# Temporary / backup files
+*.bak
+quarantine/
+
 # IDE / Editor folders
 .vscode/
 .idea/

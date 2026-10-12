@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 import os
 import secrets
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
@@ -13,11 +14,15 @@ class DatabaseManager:
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self.init_db()
 
-    def get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def get_connection(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
 
     def init_db(self):
         with self.get_connection() as conn:

@@ -41,7 +41,7 @@ class LivenessDetector:
 
         # Typical webcam face in moderate lighting has variance 25 - 400
         # Overly blurry paper print, screen capture or flat surface has very low variance
-        is_plausible = var > thresh
+        is_plausible = bool(var > thresh)
         return is_plausible, float(var)
 
     def check_temporal_liveness(self, tracking_id: str, landmarks: Dict) -> Tuple[bool, str, float]:
