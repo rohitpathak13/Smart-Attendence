@@ -32,25 +32,31 @@ class TestAttendanceSystemCore(unittest.TestCase):
         self.assertTrue(self.db.verify_admin("admin", "secret123"))
         self.assertFalse(self.db.verify_admin("admin", "wrongpass"))
 
-        # Test student registration with 128-d embedding
+        # Test student registration with numeric roll number (Phase 20)
         dummy_embedding = np.random.randn(128).astype(np.float32)
         dummy_embedding /= np.linalg.norm(dummy_embedding) # Normalize
 
-        ok, msg = self.db.register_student("CS101", "Alice Smith", "Computer Science", "alice@example.com", dummy_embedding)
+        # Alphanumeric roll number should be rejected under numeric policy
+        bad_ok, bad_msg = self.db.register_student("CS101", "Alice Smith", "Computer Science", "alice@example.com", dummy_embedding)
+        self.assertFalse(bad_ok)
+        self.assertIn("digits only", bad_msg)
+
+        # Valid numeric roll number with leading zero should be accepted and preserved
+        ok, msg = self.db.register_student("20261001", "Alice Smith", "Computer Science", "alice@example.com", dummy_embedding)
         self.assertTrue(ok)
         self.assertEqual(self.db.get_student_count(), 1)
 
         # Retrieve and verify embedding round-trip
         students = self.db.get_all_students()
         self.assertEqual(len(students), 1)
-        self.assertEqual(students[0]["roll_no"], "CS101")
+        self.assertEqual(students[0]["roll_no"], "20261001")
         self.assertTrue(np.allclose(students[0]["embedding"], dummy_embedding, atol=1e-5))
 
         # Test attendance marking
         st_id = students[0]["id"]
         ok, status_msg, info = self.db.mark_attendance(st_id, confidence=0.88, cooldown_minutes=30)
         self.assertTrue(ok)
-        self.assertEqual(info["roll_no"], "CS101")
+        self.assertEqual(info["roll_no"], "20261001")
 
         # Test cooldown deduplication (marking immediately again should fail)
         ok_again, cooldown_msg, _ = self.db.mark_attendance(st_id, confidence=0.90, cooldown_minutes=30)

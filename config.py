@@ -48,4 +48,23 @@ DEFAULT_ADMIN_USER = os.environ.get("DEFAULT_ADMIN_USER", "admin")
 DEFAULT_ADMIN_PASS = os.environ.get("DEFAULT_ADMIN_PASS", "admin123")
 SECRET_KEY = os.environ.get("SECRET_KEY", "deepvision-secret-railway-key-2026")
 
+# Campus Geofencing (Default radius is 30m, configurable to 50m or custom)
+DEFAULT_GEOFENCE_RADIUS_METERS = float(os.environ.get("GEOFENCE_RADIUS_METERS", 30.0))
+DEFAULT_CAMPUS_NAME = os.environ.get("CAMPUS_NAME", "Main Campus")
+DEFAULT_CAMPUS_LAT = float(os.environ.get("CAMPUS_LATITUDE", 28.5355))
+DEFAULT_CAMPUS_LON = float(os.environ.get("CAMPUS_LONGITUDE", 77.3910))
+DEFAULT_LOCATION_ACCURACY_THRESHOLD_METERS = float(os.environ.get("LOCATION_ACCURACY_THRESHOLD", 50.0))
+GEOFENCE_ENABLED = os.environ.get("GEOFENCE_ENABLED", "true").lower() == "true"
+
+# Lecture Scheduling & Anti-Bunking Defaults
+DEFAULT_LECTURE_DURATION_MINUTES = int(os.environ.get("LECTURE_DURATION_MINUTES", 50))
+DEFAULT_ATTENDANCE_WINDOW_BEFORE_MINS = int(os.environ.get("ATTENDANCE_WINDOW_BEFORE_MINS", 5))
+DEFAULT_ATTENDANCE_WINDOW_AFTER_MINS = int(os.environ.get("ATTENDANCE_WINDOW_AFTER_MINS", 15))
+INSTITUTION_TIMEZONE = os.environ.get("INSTITUTION_TIMEZONE", "Asia/Kolkata")
+
+# Validation Policies
+REQUIRE_NUMERIC_ROLL_NO = os.environ.get("REQUIRE_NUMERIC_ROLL_NO", "true").lower() == "true"
+INSTITUTION_EMAIL_DOMAIN = os.environ.get("INSTITUTION_EMAIL_DOMAIN", "")
+
+
 
