@@ -112,23 +112,31 @@ def _is_valid_part(part: str, mode: str) -> bool:
     """Checks if a name component conforms to Title Case or UPPERCASE."""
     if not part:
         return False
-    # Check for digits
+    # Check for digits - strictly reject digits in student names
     if any(c.isdigit() for c in part):
         return False
+
+    # Handle legitimate initials with dots (e.g., 'K.', 'A.', 'J.K.')
+    if "." in part:
+        dot_segments = [s for s in part.split(".") if s]
+        if dot_segments and all(len(s) == 1 and s.isalpha() and s.isupper() for s in dot_segments):
+            return True
 
     # Handle hyphenated parts (e.g. Mary-Jane)
     subparts = part.split("-")
     for sp in subparts:
-        # Handle apostrophes (e.g. O'Connor)
+        # Handle apostrophes (e.g. O'Connor, D'Souza)
         apostrophe_subparts = sp.split("'")
         for asp in apostrophe_subparts:
-            if not asp.isalpha():
+            # Strip trailing period on single initial if present
+            clean_asp = asp[:-1] if asp.endswith(".") and len(asp) > 1 else asp
+            if not clean_asp.isalpha():
                 return False
             if mode == "UPPER":
-                if not asp.isupper():
+                if not clean_asp.isupper():
                     return False
             elif mode == "TITLE":
-                if not (asp[0].isupper() and (len(asp) == 1 or asp[1:].islower())):
+                if not (clean_asp[0].isupper() and (len(clean_asp) == 1 or clean_asp[1:].islower())):
                     return False
     return True
 

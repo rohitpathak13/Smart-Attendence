@@ -23,6 +23,7 @@ from database.db_manager import DatabaseManager
 from core.face_engine import FaceEngine
 from core.liveness import LivenessDetector
 from core.video_capture import ThreadedCamera
+from core.validators import validate_roll_number, validate_student_name, validate_email
 
 # --- Premium Modern High-Tech Color Palette ---
 PALETTE = {
@@ -523,6 +524,25 @@ class AttendanceApp:
         if not roll or not name:
             messagebox.showwarning("Incomplete Details", "Please enter both the Roll ID and Student Name.")
             return
+
+        # 1. Roll Number Validation (numeric only, preserve leading zeros)
+        is_roll_ok, norm_roll, roll_err = validate_roll_number(roll, require_numeric=True)
+        if not is_roll_ok:
+            messagebox.showwarning("Invalid Roll ID", roll_err)
+            return
+
+        # 2. Student Name Validation (Title Case or UPPERCASE, no digits)
+        is_name_ok, norm_name, name_err = validate_student_name(name)
+        if not is_name_ok:
+            messagebox.showwarning("Invalid Student Name", name_err)
+            return
+
+        # 3. Email Validation (if entered)
+        if email:
+            is_email_ok, norm_email, email_err = validate_email(email)
+            if not is_email_ok:
+                messagebox.showwarning("Invalid Email", email_err)
+                return
 
         if self.latest_frame is None:
             messagebox.showerror("Camera Offline", "Camera feed is currently offline.")

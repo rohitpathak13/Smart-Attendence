@@ -1,5 +1,7 @@
+import json
 import sqlite3
 import hashlib
+import hmac
 import os
 import secrets
 from contextlib import contextmanager
@@ -28,6 +30,7 @@ class DatabaseManager:
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self.init_db()
+        self.init_extended_db()
 
     @contextmanager
     def get_connection(self):
@@ -81,10 +84,21 @@ class DatabaseManager:
             )
             """)
 
-            # 4. Email uniqueness constraint on students (Phase 18)
+            # 4. Normalized constraints and indexes on students
+            cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_students_roll_no_unique
+            ON students(roll_no)
+            """)
+
             cursor.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email_unique
             ON students(email)
+            WHERE email IS NOT NULL AND email != ''
+            """)
+
+            cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_students_email_nocase
+            ON students(LOWER(email))
             WHERE email IS NOT NULL AND email != ''
             """)
 
@@ -258,7 +272,333 @@ class DatabaseManager:
 
             conn.commit()
 
+    def init_extended_db(self):
+        """
+        Phase 2 (SmartAttend AI) schema extension.
+        Adds new tables without touching existing tables.
+        Safe to call multiple times (idempotent via CREATE TABLE IF NOT EXISTS).
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # 13. Departments
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS departments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                code TEXT UNIQUE NOT NULL,
+                head_teacher_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # 14. Courses
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS courses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                department_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                code TEXT UNIQUE NOT NULL,
+                semester INTEGER NOT NULL DEFAULT 1,
+                academic_year TEXT NOT NULL DEFAULT '2026-27',
+                credits INTEGER DEFAULT 4,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 15. Subjects (linked to courses)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subjects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                course_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                code TEXT UNIQUE NOT NULL,
+                type TEXT NOT NULL DEFAULT 'Theory' CHECK(type IN ('Theory', 'Practical', 'Tutorial')),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 16. Classrooms
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS classrooms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                building TEXT,
+                floor INTEGER DEFAULT 0,
+                capacity INTEGER DEFAULT 60,
+                campus_id INTEGER,
+                latitude REAL,
+                longitude REAL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (campus_id) REFERENCES campuses(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 17. Teachers
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS teachers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                department_id INTEGER,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 18. Teacher-Subject Assignments
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS teacher_subjects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                teacher_id INTEGER NOT NULL,
+                subject_id INTEGER NOT NULL,
+                classroom_id INTEGER,
+                academic_year TEXT NOT NULL DEFAULT '2026-27',
+                FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL,
+                UNIQUE(teacher_id, subject_id, academic_year)
+            )
+            """)
+
+            # 19. Parents
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS parents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                phone TEXT,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # 20. Student-Parent Links
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_parents (
+                student_id INTEGER NOT NULL,
+                parent_id INTEGER NOT NULL,
+                relation TEXT DEFAULT 'Parent',
+                PRIMARY KEY (student_id, parent_id),
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+                FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 21. Student Login Credentials (separate from biometrics)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS student_logins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                last_login TIMESTAMP,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 22. QR Tokens (one-time, time-bound attendance tokens)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS qr_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nonce TEXT UNIQUE NOT NULL,
+                session_id INTEGER NOT NULL,
+                classroom_id INTEGER,
+                teacher_id INTEGER NOT NULL,
+                issued_at TIMESTAMP NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                consumed INTEGER NOT NULL DEFAULT 0,
+                consumed_by_student_id INTEGER,
+                consumed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 23. Attendance Sessions (teacher-started sessions for QR/live marking)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS attendance_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lecture_id INTEGER,
+                subject_id INTEGER,
+                classroom_id INTEGER,
+                teacher_id INTEGER NOT NULL,
+                session_date TEXT NOT NULL,
+                started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP,
+                status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'ENDED', 'CANCELLED')),
+                qr_expiry_seconds INTEGER NOT NULL DEFAULT 30,
+                require_face INTEGER NOT NULL DEFAULT 1,
+                require_location INTEGER NOT NULL DEFAULT 1,
+                require_qr INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (lecture_id) REFERENCES lectures(id) ON DELETE SET NULL,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 24. Attendance Verification Results (multi-layer anti-proxy results)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS attendance_verification_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                lecture_id INTEGER,
+                student_id INTEGER NOT NULL,
+                overall_status TEXT NOT NULL CHECK(overall_status IN ('VERIFIED', 'REJECTED', 'PENDING_REVIEW')),
+                face_match_score REAL,
+                face_status TEXT,
+                liveness_status TEXT,
+                liveness_texture_score REAL,
+                location_status TEXT,
+                location_distance_m REAL,
+                qr_status TEXT,
+                rejection_reason TEXT,
+                submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                reviewed_by TEXT,
+                reviewed_at TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES attendance_sessions(id) ON DELETE SET NULL,
+                FOREIGN KEY (lecture_id) REFERENCES lectures(id) ON DELETE SET NULL,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 25. Registered Fixed Cameras
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cameras (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                camera_uid TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                classroom_id INTEGER,
+                campus_id INTEGER,
+                api_key_hash TEXT NOT NULL,
+                api_key_salt TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                last_seen TIMESTAMP,
+                health_status TEXT DEFAULT 'UNKNOWN',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL,
+                FOREIGN KEY (campus_id) REFERENCES campuses(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 26. BLE Beacons (optional classroom proximity)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS beacons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                beacon_uuid TEXT UNIQUE NOT NULL,
+                major INTEGER,
+                minor INTEGER,
+                name TEXT NOT NULL,
+                classroom_id INTEGER,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 27. Timetables
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS timetables (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER NOT NULL,
+                teacher_id INTEGER NOT NULL,
+                classroom_id INTEGER,
+                day_of_week INTEGER NOT NULL CHECK(day_of_week BETWEEN 0 AND 6),
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                academic_year TEXT NOT NULL DEFAULT '2026-27',
+                semester INTEGER NOT NULL DEFAULT 1,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+                FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
+            )
+            """)
+
+            # 28. Leave Requests
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS leave_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                leave_type TEXT NOT NULL DEFAULT 'MEDICAL' CHECK(leave_type IN ('MEDICAL', 'PERSONAL', 'OFFICIAL', 'BEREAVEMENT', 'OTHER')),
+                from_date TEXT NOT NULL,
+                to_date TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                supporting_document_path TEXT,
+                status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+                reviewed_by TEXT,
+                reviewed_at TIMESTAMP,
+                review_comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+            )
+            """)
+
+            # 29. Notifications
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient_type TEXT NOT NULL CHECK(recipient_type IN ('STUDENT', 'TEACHER', 'PARENT', 'ADMIN')),
+                recipient_id INTEGER NOT NULL,
+                recipient_email TEXT,
+                type TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body TEXT NOT NULL,
+                is_sent INTEGER NOT NULL DEFAULT 0,
+                sent_at TIMESTAMP,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # 30. Holidays
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS holidays (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL DEFAULT 'NATIONAL' CHECK(type IN ('NATIONAL', 'REGIONAL', 'INSTITUTIONAL')),
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # Indexes for performance on new tables
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_qr_tokens_nonce ON qr_tokens(nonce)
+            """)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_qr_tokens_session ON qr_tokens(session_id)
+            """)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_att_sessions_status ON attendance_sessions(status)
+            """)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_att_verification_student ON attendance_verification_results(student_id)
+            """)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_leave_requests_student ON leave_requests(student_id, status)
+            """)
+            cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_type, recipient_id, is_sent)
+            """)
+
+            conn.commit()
+
     # --- Security & Auth Methods ---
+
     @staticmethod
     def _hash_password(password: str, salt: Optional[str] = None) -> Tuple[str, str]:
         if not salt:
@@ -297,8 +637,8 @@ class DatabaseManager:
     def change_admin_password(self, username: str, old_pass: str, new_pass: str) -> Tuple[bool, str]:
         if not self.verify_admin(username, old_pass):
             return False, "Old password is incorrect."
-        if len(new_pass) < 4:
-            return False, "Password must be at least 4 characters."
+        if len(new_pass) < 8:
+            return False, "Password must be at least 8 characters."
         pw_hash, salt = self._hash_password(new_pass)
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -318,13 +658,15 @@ class DatabaseManager:
         department: str,
         email: str,
         embedding: np.ndarray,
-        allow_admin_override: bool = False
+        allow_admin_override: bool = False,
+        allow_update: bool = False
     ) -> Tuple[bool, str]:
         """
         Registers a new student profile or updates an existing one with strict validation:
         - Roll No: digits 0-9 only, preserving leading zeros (Phase 20)
         - Name: Title Case or UPPERCASE, no digits, no mixed case (Phase 19)
         - Email: lowercase alphanumeric local part, valid domain, duplicate check (Phase 18)
+        - Safe Duplicate Handling: Rejects duplicate roll numbers and duplicate emails unless allow_update=True
         """
         # Retrieve settings
         settings = self.get_all_settings()
@@ -355,36 +697,131 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Check email uniqueness against other registered students
+                # Check duplicate roll number
+                cursor.execute(
+                    "SELECT id, roll_no, name, email FROM students WHERE roll_no = ?",
+                    (norm_roll,)
+                )
+                existing_roll_student = cursor.fetchone()
+                if existing_roll_student and not allow_update:
+                    return False, f"Duplicate registration: Student with roll number '{norm_roll}' is already registered as '{existing_roll_student['name']}'."
+
+                # Check duplicate email against other registered students
                 if norm_email:
                     cursor.execute(
-                        "SELECT roll_no FROM students WHERE LOWER(email) = LOWER(?) AND roll_no != ?",
+                        "SELECT roll_no, name FROM students WHERE LOWER(email) = LOWER(?) AND roll_no != ?",
                         (norm_email, norm_roll)
                     )
                     existing_email_student = cursor.fetchone()
                     if existing_email_student:
-                        return False, f"An account with email '{norm_email}' is already registered (Roll No: {existing_email_student['roll_no']})."
+                        return False, f"Duplicate registration: An account with email '{norm_email}' is already registered (Roll No: {existing_email_student['roll_no']})."
 
-                cursor.execute(
-                    """
-                    INSERT INTO students (roll_no, name, department, email, embedding)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT(roll_no) DO UPDATE SET
-                        name = excluded.name,
-                        department = excluded.department,
-                        email = excluded.email,
-                        embedding = excluded.embedding
-                    """,
-                    (norm_roll, norm_name, norm_dept, norm_email, embedding_blob)
-                )
-                conn.commit()
-            return True, f"Student {norm_name} ({norm_roll}) registered successfully."
+                if existing_roll_student and allow_update:
+                    cursor.execute(
+                        """
+                        UPDATE students SET
+                            name = ?,
+                            department = ?,
+                            email = ?,
+                            embedding = ?
+                        WHERE roll_no = ?
+                        """,
+                        (norm_name, norm_dept, norm_email, embedding_blob, norm_roll)
+                    )
+                    conn.commit()
+                    return True, f"Student {norm_name} ({norm_roll}) updated successfully."
+                else:
+                    cursor.execute(
+                        """
+                        INSERT INTO students (roll_no, name, department, email, embedding)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (norm_roll, norm_name, norm_dept, norm_email, embedding_blob)
+                    )
+                    conn.commit()
+                    return True, f"Student {norm_name} ({norm_roll}) registered successfully."
         except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint failed: students.email" in str(e):
-                return False, f"An account with email '{norm_email}' is already registered."
-            return False, f"Database integrity error: {str(e)}"
+            err_msg = str(e)
+            if "students.roll_no" in err_msg or "UNIQUE constraint failed: students.roll_no" in err_msg:
+                return False, f"Duplicate registration: Student with roll number '{norm_roll}' already exists."
+            if "students.email" in err_msg or "UNIQUE constraint failed: students.email" in err_msg or "idx_students_email_nocase" in err_msg:
+                return False, f"Duplicate registration: An account with email '{norm_email}' is already registered."
+            return False, f"Database integrity error: {err_msg}"
         except Exception as e:
             return False, f"Failed to register student: {str(e)}"
+
+    def audit_student_records(self, report_path: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Audits all existing student records against current institutional policies:
+        - Roll number numeric validation and leading zero preservation
+        - Name formatting (Title Case / UPPERCASE, no digits)
+        - Email structure and lowercase policy
+        
+        Preserves existing valid records and identifies legacy / rejected records
+        separately for manual administrative review. Does NOT automatically alter or rewrite data.
+        """
+        settings = self.get_all_settings()
+        require_numeric = settings.get("require_numeric_roll_no", "true").lower() == "true"
+        inst_domain = settings.get("institution_email_domain", "")
+
+        audit_results = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "total_students": 0,
+            "valid_count": 0,
+            "legacy_rejected_count": 0,
+            "valid_records": [],
+            "rejected_legacy_records": []
+        }
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, roll_no, name, department, email, created_at FROM students ORDER BY id")
+            rows = cursor.fetchall()
+            audit_results["total_students"] = len(rows)
+
+            for row in rows:
+                student_info = {
+                    "id": row["id"],
+                    "roll_no": row["roll_no"],
+                    "name": row["name"],
+                    "department": row["department"],
+                    "email": row["email"],
+                    "created_at": str(row["created_at"])
+                }
+                issues = []
+
+                # Check roll number
+                is_roll_ok, norm_roll, roll_err = validate_roll_number(row["roll_no"], require_numeric=require_numeric)
+                if not is_roll_ok:
+                    issues.append(f"Roll Number Issue: {roll_err}")
+
+                # Check name
+                is_name_ok, norm_name, name_err = validate_student_name(row["name"], allow_admin_override=False)
+                if not is_name_ok:
+                    issues.append(f"Name Formatting Issue: {name_err}")
+
+                # Check email if provided
+                if row["email"] and str(row["email"]).strip():
+                    is_email_ok, norm_email, email_err = validate_email(str(row["email"]).strip(), institutional_domain=inst_domain)
+                    if not is_email_ok:
+                        issues.append(f"Email Issue: {email_err}")
+                elif not row["email"]:
+                    issues.append("Email Missing: Student record has no email address configured.")
+
+                if issues:
+                    student_info["review_reasons"] = issues
+                    audit_results["rejected_legacy_records"].append(student_info)
+                    audit_results["legacy_rejected_count"] += 1
+                else:
+                    audit_results["valid_records"].append(student_info)
+                    audit_results["valid_count"] += 1
+
+        if report_path:
+            os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(audit_results, f, indent=2)
+
+        return audit_results
 
     def get_all_students(self) -> List[Dict]:
         with self.get_connection() as conn:
@@ -1424,3 +1861,1026 @@ class DatabaseManager:
         df.columns = ["Roll No", "Name", "Department", "Date", "Time", "Status", "Confidence"]
         df.to_csv(file_path, index=False)
         return True, f"Exported {len(df)} records to {file_path}"
+
+    # =========================================================================
+    # --- PHASE 2 - 14: SMARTATTEND AI EXTENDED METHODS ---
+    # =========================================================================
+
+    # --- 1. Departments ---
+    def create_department(self, name: str, code: str, head_teacher_id: Optional[int] = None) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO departments (name, code, head_teacher_id) VALUES (?, ?, ?)",
+                    (name.strip(), code.strip().upper(), head_teacher_id)
+                )
+                dept_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Department '{name}' created successfully.", dept_id
+        except sqlite3.IntegrityError:
+            return False, f"Department with name '{name}' or code '{code}' already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_departments(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM departments ORDER BY name ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_department_by_id(self, dept_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM departments WHERE id = ?", (dept_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # --- 2. Courses ---
+    def create_course(self, department_id: int, name: str, code: str, semester: int = 1, credits: int = 4) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO courses (department_id, name, code, semester, credits) VALUES (?, ?, ?, ?, ?)",
+                    (department_id, name.strip(), code.strip().upper(), semester, credits)
+                )
+                course_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Course '{name}' created successfully.", course_id
+        except sqlite3.IntegrityError:
+            return False, f"Course with code '{code}' already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_courses(self, department_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if department_id:
+                cursor.execute("SELECT * FROM courses WHERE department_id = ? ORDER BY code ASC", (department_id,))
+            else:
+                cursor.execute("SELECT * FROM courses ORDER BY code ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 3. Subjects ---
+    def create_subject(self, course_id: int, name: str, code: str, sub_type: str = "Theory") -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO subjects (course_id, name, code, type) VALUES (?, ?, ?, ?)",
+                    (course_id, name.strip(), code.strip().upper(), sub_type)
+                )
+                sub_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Subject '{name}' created successfully.", sub_id
+        except sqlite3.IntegrityError:
+            return False, f"Subject with code '{code}' already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_subjects(self, course_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if course_id:
+                cursor.execute("SELECT * FROM subjects WHERE course_id = ? ORDER BY name ASC", (course_id,))
+            else:
+                cursor.execute("SELECT * FROM subjects ORDER BY name ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 4. Classrooms ---
+    def create_classroom(
+        self,
+        name: str,
+        building: str = "Main Building",
+        floor: int = 1,
+        capacity: int = 60,
+        campus_id: Optional[int] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None
+    ) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO classrooms (name, building, floor, capacity, campus_id, latitude, longitude)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (name.strip(), building.strip(), floor, capacity, campus_id, latitude, longitude))
+                c_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Classroom '{name}' created successfully.", c_id
+        except Exception as e:
+            return False, str(e), None
+
+    def get_classrooms(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM classrooms WHERE is_active = 1 ORDER BY name ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_classroom_by_id(self, classroom_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM classrooms WHERE id = ?", (classroom_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # --- 5. Teachers & Assignments ---
+    def create_teacher(
+        self,
+        employee_id: str,
+        name: str,
+        email: str,
+        password: str,
+        department_id: Optional[int] = None
+    ) -> Tuple[bool, str, Optional[int]]:
+        pw_hash, salt = self._hash_password(password)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO teachers (employee_id, name, email, department_id, password_hash, salt)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (employee_id.strip().upper(), name.strip(), email.strip().lower(), department_id, pw_hash, salt))
+                t_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Teacher '{name}' registered successfully.", t_id
+        except sqlite3.IntegrityError:
+            return False, "Teacher with this Employee ID or Email already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_teachers(self, department_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if department_id:
+                cursor.execute("SELECT id, employee_id, name, email, department_id, is_active, created_at FROM teachers WHERE department_id = ?", (department_id,))
+            else:
+                cursor.execute("SELECT id, employee_id, name, email, department_id, is_active, created_at FROM teachers ORDER BY name ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_teacher_by_id(self, teacher_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, employee_id, name, email, department_id, is_active, created_at FROM teachers WHERE id = ?", (teacher_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def verify_teacher_login(self, email_or_empid: str, password: str) -> Optional[Dict[str, Any]]:
+        clean_id = email_or_empid.strip().lower()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM teachers WHERE (LOWER(email) = ? OR LOWER(employee_id) = ?) AND is_active = 1",
+                (clean_id, clean_id.upper())
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            stored_hash = row["password_hash"]
+            salt = row["salt"]
+            calculated_hash, _ = self._hash_password(password, salt)
+            if hmac.compare_digest(stored_hash, calculated_hash):
+                return {
+                    "id": row["id"],
+                    "employee_id": row["employee_id"],
+                    "name": row["name"],
+                    "email": row["email"],
+                    "department_id": row["department_id"],
+                    "role": "TEACHER"
+                }
+            return None
+
+    def assign_teacher_subject(self, teacher_id: int, subject_id: int, classroom_id: Optional[int] = None) -> Tuple[bool, str]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT OR REPLACE INTO teacher_subjects (teacher_id, subject_id, classroom_id)
+                VALUES (?, ?, ?)
+                """, (teacher_id, subject_id, classroom_id))
+                conn.commit()
+                return True, "Subject assigned to teacher successfully."
+        except Exception as e:
+            return False, str(e)
+
+    def get_teacher_assigned_subjects(self, teacher_id: int) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT ts.id, ts.teacher_id, ts.subject_id, ts.classroom_id,
+                   s.name as subject_name, s.code as subject_code, s.type as subject_type,
+                   c.name as classroom_name, c.building, c.floor
+            FROM teacher_subjects ts
+            JOIN subjects s ON ts.subject_id = s.id
+            LEFT JOIN classrooms c ON ts.classroom_id = c.id
+            WHERE ts.teacher_id = ?
+            """, (teacher_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 6. Student Portal & Credentials ---
+    def create_student_login(self, student_id: int, password: str) -> Tuple[bool, str]:
+        pw_hash, salt = self._hash_password(password)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT OR REPLACE INTO student_logins (student_id, password_hash, salt, is_active)
+                VALUES (?, ?, ?, 1)
+                """, (student_id, pw_hash, salt))
+                conn.commit()
+                return True, "Student login credentials configured successfully."
+        except Exception as e:
+            return False, str(e)
+
+    def verify_student_login(self, roll_or_email: str, password: str) -> Optional[Dict[str, Any]]:
+        clean_id = roll_or_email.strip().lower()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT s.id, s.roll_no, s.name, s.department, s.email, sl.password_hash, sl.salt
+            FROM students s
+            JOIN student_logins sl ON s.id = sl.student_id
+            WHERE (LOWER(s.roll_no) = ? OR LOWER(s.email) = ?) AND sl.is_active = 1
+            """, (clean_id, clean_id))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            stored_hash = row["password_hash"]
+            salt = row["salt"]
+            calculated_hash, _ = self._hash_password(password, salt)
+            if hmac.compare_digest(stored_hash, calculated_hash):
+                # Update last login
+                cursor.execute("UPDATE student_logins SET last_login = CURRENT_TIMESTAMP WHERE student_id = ?", (row["id"],))
+                conn.commit()
+                return {
+                    "id": row["id"],
+                    "roll_number": row["roll_no"],
+                    "name": row["name"],
+                    "department": row["department"],
+                    "email": row["email"],
+                    "role": "STUDENT"
+                }
+            return None
+
+    def get_student_by_id(self, student_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, roll_no, name, department, email, created_at FROM students WHERE id = ?", (student_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_student_by_roll(self, roll_no: str) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, roll_no, name, department, email, created_at FROM students WHERE roll_no = ?", (roll_no.strip(),))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_student_attendance_stats(self, student_id: int) -> Dict[str, Any]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT roll_no, name, department FROM students WHERE id = ?", (student_id,))
+            s_row = cursor.fetchone()
+            if not s_row:
+                return {"total_lectures": 0, "attended": 0, "percentage": 0.0}
+
+            # Count distinct lectures or attendance marks
+            cursor.execute("SELECT COUNT(*) FROM attendance WHERE student_id = ? AND status IN ('PRESENT', 'LATE')", (student_id,))
+            attended_count = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(DISTINCT lecture_id) FROM lecture_attendance WHERE student_id = ?", (student_id,))
+            total_lectures = cursor.fetchone()[0]
+            if total_lectures == 0:
+                # Fallback to total system lectures
+                cursor.execute("SELECT COUNT(*) FROM lectures WHERE status != 'CANCELLED'")
+                total_lectures = cursor.fetchone()[0]
+
+            total_lectures = max(total_lectures, attended_count)
+            pct = round((attended_count / total_lectures) * 100.0, 1) if total_lectures > 0 else 0.0
+
+            return {
+                "student_id": student_id,
+                "roll_number": s_row["roll_no"],
+                "name": s_row["name"],
+                "department": s_row["department"],
+                "total_lectures": total_lectures,
+                "attended": attended_count,
+                "percentage": pct
+            }
+
+    def is_attendance_already_recorded(self, student_id: int, lecture_id: Optional[int] = None, date_str: Optional[str] = None) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if lecture_id is not None:
+                cursor.execute(
+                    "SELECT id FROM lecture_attendance WHERE lecture_id = ? AND student_id = ?",
+                    (lecture_id, student_id)
+                )
+                return cursor.fetchone() is not None
+            elif date_str is not None:
+                cursor.execute(
+                    "SELECT id FROM attendance WHERE student_id = ? AND date = ?",
+                    (student_id, date_str)
+                )
+                return cursor.fetchone() is not None
+            else:
+                today = datetime.now().strftime("%Y-%m-%d")
+                cursor.execute(
+                    "SELECT id FROM attendance WHERE student_id = ? AND date = ?",
+                    (student_id, today)
+                )
+                return cursor.fetchone() is not None
+
+    def get_student_lecture_history(self, student_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT la.id, la.date, la.marked_at as time, la.status, la.confidence,
+                   COALESCE(l.subject_name, 'General') as subject,
+                   COALESCE(l.start_time, '09:00') as start_time,
+                   COALESCE(l.end_time, '17:00') as end_time,
+                   COALESCE(l.status, 'COMPLETED') as lecture_status
+            FROM lecture_attendance la
+            LEFT JOIN lectures l ON la.lecture_id = l.id
+            WHERE la.student_id = ?
+            ORDER BY la.date DESC, la.marked_at DESC
+            LIMIT ?
+            """, (student_id, limit))
+            records = [dict(row) for row in cursor.fetchall()]
+            if not records:
+                cursor.execute("""
+                SELECT a.id, a.date, a.time, a.status, a.confidence,
+                       'General' as subject, '09:00' as start_time, '17:00' as end_time, 'COMPLETED' as lecture_status
+                FROM attendance a
+                WHERE a.student_id = ?
+                ORDER BY a.date DESC, a.time DESC
+                LIMIT ?
+                """, (student_id, limit))
+                records = [dict(row) for row in cursor.fetchall()]
+            return records
+
+    def get_student_subject_breakdown(self, student_id: int) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT COALESCE(l.subject_name, 'General Attendance') as subject_name,
+                   COUNT(*) as total_conducted,
+                   SUM(CASE WHEN la.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as attended
+            FROM lecture_attendance la
+            LEFT JOIN lectures l ON la.lecture_id = l.id
+            WHERE la.student_id = ?
+            GROUP BY subject_name
+            """, (student_id,))
+            rows = cursor.fetchall()
+            results = []
+            for r in rows:
+                total = r["total_conducted"]
+                att = r["attended"] or 0
+                pct = round((att / total) * 100.0, 1) if total > 0 else 0.0
+                results.append({
+                    "subject": r["subject_name"],
+                    "total_classes": total,
+                    "attended": att,
+                    "percentage": pct,
+                    "status": "Safe" if pct >= 75.0 else "Shortage"
+                })
+            return results
+
+    # --- 7. Parent Management & Auth ---
+    def create_parent(self, name: str, email: str, password: str, phone: Optional[str] = None) -> Tuple[bool, str, Optional[int]]:
+        pw_hash, salt = self._hash_password(password)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO parents (name, email, phone, password_hash, salt)
+                VALUES (?, ?, ?, ?, ?)
+                """, (name.strip(), email.strip().lower(), phone, pw_hash, salt))
+                p_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Parent '{name}' registered successfully.", p_id
+        except sqlite3.IntegrityError:
+            return False, "Parent with this email already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def link_student_parent(self, student_id: int, parent_id: int, relation: str = "Parent") -> Tuple[bool, str]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT OR REPLACE INTO student_parents (student_id, parent_id, relation)
+                VALUES (?, ?, ?)
+                """, (student_id, parent_id, relation))
+                conn.commit()
+                return True, "Parent linked to student successfully."
+        except Exception as e:
+            return False, str(e)
+
+    def verify_parent_login(self, email: str, password: str) -> Optional[Dict[str, Any]]:
+        clean_email = email.strip().lower()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM parents WHERE LOWER(email) = ?", (clean_email,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            stored_hash = row["password_hash"]
+            salt = row["salt"]
+            calc_hash, _ = self._hash_password(password, salt)
+            if hmac.compare_digest(stored_hash, calc_hash):
+                return {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "email": row["email"],
+                    "role": "PARENT"
+                }
+            return None
+
+    def get_parent_wards(self, parent_id: int) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT s.id, s.roll_no, s.name, s.department, s.email, sp.relation
+            FROM student_parents sp
+            JOIN students s ON sp.student_id = s.id
+            WHERE sp.parent_id = ?
+            """, (parent_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 8. Dynamic Attendance Sessions (QR & Live Verification) ---
+    def create_attendance_session(
+        self,
+        teacher_id: int,
+        subject_id: Optional[int] = None,
+        classroom_id: Optional[int] = None,
+        lecture_id: Optional[int] = None,
+        qr_expiry_seconds: int = 30,
+        require_face: bool = True,
+        require_location: bool = True,
+        require_qr: bool = True
+    ) -> Tuple[bool, str, Optional[int]]:
+        today = datetime.now().strftime("%Y-%m-%d")
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO attendance_sessions (
+                    teacher_id, subject_id, classroom_id, lecture_id, session_date,
+                    qr_expiry_seconds, require_face, require_location, require_qr, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+                """, (
+                    teacher_id, subject_id, classroom_id, lecture_id, today,
+                    qr_expiry_seconds, 1 if require_face else 0,
+                    1 if require_location else 0, 1 if require_qr else 0
+                ))
+                sess_id = cursor.lastrowid
+                conn.commit()
+                return True, "Attendance session started successfully.", sess_id
+        except Exception as e:
+            return False, str(e), None
+
+    def end_attendance_session(self, session_id: int, teacher_id: Optional[int] = None) -> Tuple[bool, str]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if teacher_id:
+                cursor.execute(
+                    "UPDATE attendance_sessions SET status = 'ENDED', ended_at = CURRENT_TIMESTAMP WHERE id = ? AND teacher_id = ?",
+                    (session_id, teacher_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE attendance_sessions SET status = 'ENDED', ended_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (session_id,)
+                )
+            if cursor.rowcount > 0:
+                conn.commit()
+                return True, "Session closed successfully."
+            return False, "Session not found or unauthorized."
+
+    def get_session_by_id(self, session_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT sess.*, s.name as subject_name, s.code as subject_code,
+                   c.name as classroom_name, c.latitude, c.longitude,
+                   t.name as teacher_name
+            FROM attendance_sessions sess
+            LEFT JOIN subjects s ON sess.subject_id = s.id
+            LEFT JOIN classrooms c ON sess.classroom_id = c.id
+            LEFT JOIN teachers t ON sess.teacher_id = t.id
+            WHERE sess.id = ?
+            """, (session_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # --- 9. QR Token Nonce Tracking ---
+    def store_qr_token(self, nonce: str, session_id: int, teacher_id: int, classroom_id: Optional[int], expiry_seconds: int = 30) -> bool:
+        now = datetime.now()
+        exp = now + timedelta(seconds=expiry_seconds)
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+        exp_str = exp.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO qr_tokens (nonce, session_id, teacher_id, classroom_id, issued_at, expires_at, consumed)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+                """, (nonce, session_id, teacher_id, classroom_id, now_str, exp_str))
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    def is_qr_nonce_consumed(self, nonce: str) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT consumed FROM qr_tokens WHERE nonce = ?", (nonce,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            return bool(row["consumed"])
+
+    def mark_qr_nonce_consumed(self, nonce: str, student_id: int) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE qr_tokens
+            SET consumed = 1, consumed_by_student_id = ?, consumed_at = CURRENT_TIMESTAMP
+            WHERE nonce = ? AND consumed = 0
+            """, (student_id, nonce))
+            updated = cursor.rowcount > 0
+            conn.commit()
+            return updated
+
+    # --- 10. Multi-Layer Verification Results & Reviews ---
+    def record_verification_result(
+        self,
+        student_id: int,
+        overall_status: str,
+        session_id: Optional[int] = None,
+        lecture_id: Optional[int] = None,
+        face_match_score: Optional[float] = None,
+        face_status: Optional[str] = None,
+        liveness_status: Optional[str] = None,
+        liveness_texture_score: Optional[float] = None,
+        location_status: Optional[str] = None,
+        location_distance_m: Optional[float] = None,
+        qr_status: Optional[str] = None,
+        rejection_reason: Optional[str] = None
+    ) -> int:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO attendance_verification_results (
+                student_id, overall_status, session_id, lecture_id, face_match_score,
+                face_status, liveness_status, liveness_texture_score, location_status,
+                location_distance_m, qr_status, rejection_reason
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                student_id, overall_status, session_id, lecture_id, face_match_score,
+                face_status, liveness_status, liveness_texture_score, location_status,
+                location_distance_m, qr_status, rejection_reason
+            ))
+            res_id = cursor.lastrowid
+            conn.commit()
+            return res_id
+
+    def get_pending_verification_reviews(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT vr.*, s.roll_no, s.name as student_name, s.department
+            FROM attendance_verification_results vr
+            JOIN students s ON vr.student_id = s.id
+            WHERE vr.overall_status = 'PENDING_REVIEW'
+            ORDER BY vr.submitted_at DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def review_verification_result(self, result_id: int, new_status: str, reviewed_by: str) -> bool:
+        if new_status not in ("VERIFIED", "REJECTED"):
+            return False
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE attendance_verification_results
+            SET overall_status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """, (new_status, reviewed_by, result_id))
+            updated = cursor.rowcount > 0
+            conn.commit()
+            return updated
+
+    # --- 11. Leave Requests ---
+    def submit_leave_request(
+        self,
+        student_id: int,
+        leave_type: str,
+        from_date: str,
+        to_date: str,
+        reason: str,
+        document_path: Optional[str] = None
+    ) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO leave_requests (student_id, leave_type, from_date, to_date, reason, supporting_document_path, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+                """, (student_id, leave_type.upper(), from_date, to_date, reason.strip(), document_path))
+                req_id = cursor.lastrowid
+                conn.commit()
+                return True, "Leave request submitted successfully.", req_id
+        except Exception as e:
+            return False, str(e), None
+
+    def get_student_leave_requests(self, student_id: int) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM leave_requests WHERE student_id = ? ORDER BY created_at DESC
+            """, (student_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_pending_leave_requests(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT lr.*, s.roll_no, s.name as student_name, s.department
+            FROM leave_requests lr
+            JOIN students s ON lr.student_id = s.id
+            WHERE lr.status = 'PENDING'
+            ORDER BY lr.created_at ASC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def review_leave_request(self, request_id: int, decision: str, reviewer_name: str, comment: Optional[str] = None) -> Tuple[bool, str]:
+        if decision not in ("APPROVED", "REJECTED"):
+            return False, "Invalid decision: must be APPROVED or REJECTED"
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE leave_requests
+            SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, review_comment = ?
+            WHERE id = ? AND status = 'PENDING'
+            """, (decision, reviewer_name, comment, request_id))
+            if cursor.rowcount > 0:
+                conn.commit()
+                return True, f"Leave request marked {decision}."
+            return False, "Request not found or already processed."
+
+    # --- 12. Notifications ---
+    def create_notification_record(
+        self,
+        recipient_type: str,
+        recipient_id: int,
+        recipient_email: Optional[str],
+        notification_type: str,
+        subject: str,
+        body: str
+    ) -> int:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO notifications (recipient_type, recipient_id, recipient_email, type, subject, body, is_sent)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+            """, (recipient_type.upper(), recipient_id, recipient_email, notification_type, subject, body))
+            nid = cursor.lastrowid
+            conn.commit()
+            return nid
+
+    def mark_notification_sent(self, notif_id: int, is_sent: int = 1, error_message: Optional[str] = None):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE notifications
+            SET is_sent = ?, sent_at = CURRENT_TIMESTAMP, error_message = ?
+            WHERE id = ?
+            """, (is_sent, error_message, notif_id))
+            conn.commit()
+
+    def get_user_notifications(self, recipient_type: str, recipient_id: int, limit: int = 20) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM notifications
+            WHERE recipient_type = ? AND recipient_id = ?
+            ORDER BY created_at DESC LIMIT ?
+            """, (recipient_type.upper(), recipient_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 13. Reports & Analytics Helper Queries ---
+    def get_filtered_attendance_records(
+        self,
+        lecture_id: Optional[int] = None,
+        date_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if lecture_id:
+                query = """
+                SELECT la.id, la.student_id, s.roll_no, s.name, s.department,
+                       COALESCE(l.subject_name, 'General') as subject, la.lecture_id,
+                       la.date, la.marked_at as timestamp, la.status,
+                       'SMARTATTEND_MULTI_LAYER' as verification_method,
+                       'VERIFIED' as location_status
+                FROM lecture_attendance la
+                JOIN students s ON la.student_id = s.id
+                LEFT JOIN lectures l ON la.lecture_id = l.id
+                WHERE la.lecture_id = ?
+                """
+                params = [lecture_id]
+                if date_filter:
+                    query += " AND la.date = ?"
+                    params.append(date_filter)
+                query += " ORDER BY la.date DESC, la.marked_at DESC"
+                cursor.execute(query, params)
+                return [dict(row) for row in cursor.fetchall()]
+            else:
+                query = """
+                SELECT a.id, a.student_id, s.roll_no, s.name, s.department,
+                       'General' as subject, 0 as lecture_id,
+                       a.date, a.time as timestamp, a.status,
+                       'FACE_GEOFENCE' as verification_method,
+                       'VERIFIED' as location_status
+                FROM attendance a
+                JOIN students s ON a.student_id = s.id
+                WHERE 1=1
+                """
+                params = []
+                if date_filter:
+                    query += " AND a.date = ?"
+                    params.append(date_filter)
+                query += " ORDER BY a.date DESC, a.time DESC"
+                cursor.execute(query, params)
+                records = [dict(row) for row in cursor.fetchall()]
+                if not records:
+                    query2 = """
+                    SELECT la.id, la.student_id, s.roll_no, s.name, s.department,
+                           COALESCE(l.subject_name, 'General') as subject, la.lecture_id,
+                           la.date, la.marked_at as timestamp, la.status,
+                           'SMARTATTEND_MULTI_LAYER' as verification_method,
+                           'VERIFIED' as location_status
+                    FROM lecture_attendance la
+                    JOIN students s ON la.student_id = s.id
+                    LEFT JOIN lectures l ON la.lecture_id = l.id
+                    WHERE 1=1
+                    """
+                    params2 = []
+                    if date_filter:
+                        query2 += " AND la.date = ?"
+                        params2.append(date_filter)
+                    query2 += " ORDER BY la.date DESC, la.marked_at DESC"
+                    cursor.execute(query2, params2)
+                    records = [dict(row) for row in cursor.fetchall()]
+                return records
+
+    def get_students_summary_for_reports(self, department_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT s.id, s.roll_no, s.name, s.department, s.email FROM students s WHERE 1=1"
+            params = []
+            if department_id:
+                # Resolve department name
+                cursor.execute("SELECT name FROM departments WHERE id = ?", (department_id,))
+                drow = cursor.fetchone()
+                if drow:
+                    query += " AND s.department = ?"
+                    params.append(drow["name"])
+            cursor.execute(query, params)
+            students = cursor.fetchall()
+            summaries = []
+            for s in students:
+                stats = self.get_student_attendance_stats(s["id"])
+                summaries.append({
+                    "id": s["id"],
+                    "roll_number": s["roll_no"],
+                    "name": s["name"],
+                    "department": s["department"],
+                    "email": s["email"],
+                    "total_classes": stats["total_lectures"],
+                    "attended_classes": stats["attended"],
+                    "percentage": stats["percentage"]
+                })
+            return summaries
+
+    def get_daily_attendance_counts(self, student_id: Optional[int] = None, days_back: int = 90) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cutoff = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+            if student_id:
+                cursor.execute("""
+                SELECT date, COUNT(*) as count
+                FROM attendance
+                WHERE student_id = ? AND date >= ? AND status IN ('PRESENT', 'LATE')
+                GROUP BY date ORDER BY date ASC
+                """, (student_id, cutoff))
+            else:
+                cursor.execute("""
+                SELECT date, COUNT(DISTINCT student_id) as count
+                FROM attendance
+                WHERE date >= ? AND status IN ('PRESENT', 'LATE')
+                GROUP BY date ORDER BY date ASC
+                """, (cutoff,))
+            return [{"date": row["date"], "count": row["count"]} for row in cursor.fetchall()]
+
+    def get_students_by_department(self, department_id: int) -> List[Dict[str, Any]]:
+        dept = self.get_department_by_id(department_id)
+        if not dept:
+            return []
+        dept_name = dept["name"]
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, roll_no, name, department, email FROM students WHERE department = ?", (dept_name,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_monthly_system_attendance(self, months_back: int = 6) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT SUBSTR(date, 1, 7) as month,
+                   COUNT(*) as total_marked,
+                   SUM(CASE WHEN status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as present_count
+            FROM attendance
+            GROUP BY month
+            ORDER BY month DESC
+            LIMIT ?
+            """, (months_back,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in reversed(rows)]
+
+    def record_offline_attendance(
+        self,
+        student_id: int,
+        lecture_id: int,
+        date_str: str,
+        time_str: str,
+        verification_method: str = "OFFLINE_SYNC",
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        submitted_by: str = "OFFLINE_CLIENT"
+    ) -> bool:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Ensure lecture exists or create a default record to satisfy FK
+                cursor.execute("SELECT id FROM lectures WHERE id = ?", (lecture_id,))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                    INSERT OR IGNORE INTO lectures (id, course_code, subject_name, instructor_name, date, start_time, end_time, status)
+                    VALUES (?, 'GEN101', 'General', 'System', ?, ?, '17:00:00', 'Open')
+                    """, (lecture_id, date_str, time_str))
+
+                cursor.execute("""
+                INSERT OR REPLACE INTO lecture_attendance (lecture_id, student_id, date, marked_at, status, confidence, initial_verified)
+                VALUES (?, ?, ?, ?, 'PRESENT', 0.99, 1)
+                """, (lecture_id, student_id, date_str, time_str))
+
+                cursor.execute("SELECT id FROM attendance WHERE student_id = ? AND date = ?", (student_id, date_str))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                    INSERT INTO attendance (student_id, date, time, status, confidence)
+                    VALUES (?, ?, ?, 'PRESENT', 0.99)
+                    """, (student_id, date_str, time_str))
+                conn.commit()
+                return True
+        except Exception:
+            return False
+
+    # --- 14. Camera & Beacon Management ---
+    def create_camera(self, camera_uid: str, name: str, api_key: str, classroom_id: Optional[int] = None) -> Tuple[bool, str, Optional[int]]:
+        key_hash, salt = self._hash_password(api_key)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO cameras (camera_uid, name, classroom_id, api_key_hash, api_key_salt, is_active, health_status)
+                VALUES (?, ?, ?, ?, ?, 1, 'ONLINE')
+                """, (camera_uid.strip(), name.strip(), classroom_id, key_hash, salt))
+                cam_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Camera '{name}' registered.", cam_id
+        except sqlite3.IntegrityError:
+            return False, "Camera with this UID already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_cameras(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT c.id, c.camera_uid, c.name, c.classroom_id, c.is_active, c.last_seen, c.health_status,
+                   cr.name as classroom_name
+            FROM cameras c
+            LEFT JOIN classrooms cr ON c.classroom_id = cr.id
+            ORDER BY c.name ASC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def verify_camera_key(self, camera_uid: str, api_key: str) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM cameras WHERE camera_uid = ? AND is_active = 1", (camera_uid.strip(),))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            stored_hash = row["api_key_hash"]
+            salt = row["api_key_salt"]
+            calc_hash, _ = self._hash_password(api_key, salt)
+            if hmac.compare_digest(stored_hash, calc_hash):
+                # Update last seen
+                cursor.execute("UPDATE cameras SET last_seen = CURRENT_TIMESTAMP, health_status = 'ONLINE' WHERE id = ?", (row["id"],))
+                conn.commit()
+                return dict(row)
+            return None
+
+    def create_beacon(self, beacon_uuid: str, name: str, classroom_id: Optional[int] = None, major: Optional[int] = None, minor: Optional[int] = None) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO beacons (beacon_uuid, name, classroom_id, major, minor, is_active)
+                VALUES (?, ?, ?, ?, ?, 1)
+                """, (beacon_uuid.strip(), name.strip(), classroom_id, major, minor))
+                b_id = cursor.lastrowid
+                conn.commit()
+                return True, f"Beacon '{name}' registered.", b_id
+        except sqlite3.IntegrityError:
+            return False, "Beacon with this UUID already exists.", None
+        except Exception as e:
+            return False, str(e), None
+
+    def get_beacons(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT b.*, cr.name as classroom_name
+            FROM beacons b
+            LEFT JOIN classrooms cr ON b.classroom_id = cr.id
+            ORDER BY b.name ASC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 15. Timetables ---
+    def create_timetable_entry(
+        self,
+        subject_id: int,
+        teacher_id: int,
+        day_of_week: int,
+        start_time: str,
+        end_time: str,
+        classroom_id: Optional[int] = None
+    ) -> Tuple[bool, str, Optional[int]]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO timetables (subject_id, teacher_id, day_of_week, start_time, end_time, classroom_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (subject_id, teacher_id, day_of_week, start_time, end_time, classroom_id))
+                tt_id = cursor.lastrowid
+                conn.commit()
+                return True, "Timetable entry created.", tt_id
+        except Exception as e:
+            return False, str(e), None
+
+    def get_timetables_by_teacher(self, teacher_id: int) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT tt.*, s.name as subject_name, s.code as subject_code, cr.name as classroom_name
+            FROM timetables tt
+            JOIN subjects s ON tt.subject_id = s.id
+            LEFT JOIN classrooms cr ON tt.classroom_id = cr.id
+            WHERE tt.teacher_id = ? AND tt.is_active = 1
+            ORDER BY tt.day_of_week, tt.start_time
+            """, (teacher_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    # --- 16. Holidays ---
+    def add_holiday(self, date_str: str, name: str, h_type: str = "NATIONAL") -> Tuple[bool, str]:
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO holidays (date, name, type) VALUES (?, ?, ?)", (date_str, name.strip(), h_type.upper()))
+                conn.commit()
+                return True, f"Holiday '{name}' added for {date_str}."
+        except sqlite3.IntegrityError:
+            return False, f"Holiday already exists for date {date_str}."
+        except Exception as e:
+            return False, str(e)
+
+    def get_holidays(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM holidays WHERE is_active = 1 ORDER BY date ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def is_holiday(self, date_str: str) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM holidays WHERE date = ? AND is_active = 1", (date_str,))
+            return cursor.fetchone()[0] > 0
+

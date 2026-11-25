@@ -1,34 +1,58 @@
-# Python Bytecode
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environment
-.env
-venv/
+*.so
+.Python
 env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
 
-# SQLite Database & Exported logs
-data/*.db
-exports/*.csv
-
-# Large ONNX Model Binaries (auto-downloaded on first run)
-models/*.onnx
-models/*.download
-
-# Sensitive credential files & shortcuts
-psd.txt
-*.lnk
-psd.txt.lnk
-TrainingImageLabel/psd.txt
-*.env
-!*.env.example
-
-# Temporary / backup files
-*.bak
-quarantine/
-
-# IDE / Editor folders
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
+# Security — NEVER commit these
+*.env
+.env
+.env.local
+.env.production
+*.pem
+*.key
+*.secret
+
+# Sensitive Data — NEVER commit student records or biometrics
+Attendance/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+exports/
+
+# Legacy CSV files (student attendance records)
+*.csv
+psd.txt
+psd.txt.lnk
+
+# Models (large binary files — download at build time)
+# models/*.onnx   <- Keep this commented if you DO commit models
+# Uncomment to exclude from git if using build-time downloads:
+# models/
+
+# Docker & system artifacts
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Railway — only commit railway.json, not secrets

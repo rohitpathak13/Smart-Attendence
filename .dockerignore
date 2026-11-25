@@ -1,17 +1,45 @@
-.git
+# Exclude VCS
+.git/
 .gitignore
-__pycache__
-*/__pycache__
-*/*/__pycache__
+.gitattributes
+
+# Exclude development artifacts
+__pycache__/
+*.py[cod]
 *.pyc
 *.pyo
 *.pyd
-.env
-.venv
-venv/
-env/
-.pytest_cache
-.vscode
-.idea
-*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Exclude sensitive data - NEVER in container image
+Attendance/
+*.csv
+psd.txt
 psd.txt.lnk
+data/*.db
+data/*.db-shm
+data/*.db-wal
+exports/
+*.env
+.env
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+
+# Exclude docs that inflate image size
+*.md
+!README.md
+
+# Exclude tests (not needed in production container)
+test_*.py
+
+# Exclude local logs
+*.log
+
+# Windows system files
+Thumbs.db
+desktop.ini

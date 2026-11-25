@@ -5,14 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description"
-    content="DeepVision AI - Enterprise Contactless Facial Recognition, Geofenced Attendance & Anti-Bunking Monitoring System">
-  <title>⚡ DeepVision AI — Smart Face Attendance System</title>
+    content="SmartAttend AI - Intelligent Location Verified Attendance & College Management Platform. Multi-layer anti-proxy verification, face recognition, geofencing, dynamic QR, and predictive analytics.">
+  <title>⚡ SmartAttend AI — Intelligent Attendance & College Management</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=3.0">
+  <link rel="stylesheet" href="/static/style.css?v=4.0">
 </head>
 
 <body>
@@ -27,8 +27,8 @@
         <span class="brand-icon">⚡</span>
       </div>
       <div>
-        <h1 class="brand-title">DeepVision <span class="brand-accent">AI</span></h1>
-        <p class="brand-subtitle">Geofenced Face Attendance • Anti-Bunking Edition</p>
+        <h1 class="brand-title">SmartAttend <span class="brand-accent">AI</span></h1>
+        <p class="brand-subtitle">Intelligent Location Verified Attendance & College Platform</p>
       </div>
     </div>
 
@@ -43,27 +43,37 @@
         <span id="system-status-text">Connecting...</span>
       </div>
       <div class="clock-pill" id="live-clock">--:--:--</div>
+      <button id="btn-header-login" class="btn btn-secondary btn-sm" style="margin-left: 0.5rem;">🔑 Switch Role / Login</button>
     </div>
 
     <!-- Navigation Tabs -->
     <nav class="header-nav">
       <button class="nav-tab active" data-tab="attendance-tab" id="nav-attendance">
-        <span class="tab-icon">📷</span> Live Attendance
+        <span class="tab-icon">📷</span> Live Kiosk
       </button>
-      <button class="nav-tab" data-tab="lectures-tab" id="nav-lectures">
-        <span class="tab-icon">🎓</span> Lectures & Anti-Bunking
+      <button class="nav-tab" data-tab="teacher-tab" id="nav-teacher">
+        <span class="tab-icon">👨‍🏫</span> Teacher Portal
       </button>
-      <button class="nav-tab" data-tab="enroll-tab" id="nav-enroll">
-        <span class="tab-icon">👤</span> Enroll Student
+      <button class="nav-tab" data-tab="student-tab" id="nav-student">
+        <span class="tab-icon">🎒</span> Student Portal
+      </button>
+      <button class="nav-tab" data-tab="parent-tab" id="nav-parent">
+        <span class="tab-icon">👨‍👩‍👧</span> Parent Portal
+      </button>
+      <button class="nav-tab" data-tab="analytics-tab" id="nav-analytics">
+        <span class="tab-icon">🧠</span> AI Analytics
+      </button>
+      <button class="nav-tab" data-tab="security-tab" id="nav-security">
+        <span class="tab-icon">🛡️</span> Security & Reviews
       </button>
       <button class="nav-tab" data-tab="reports-tab" id="nav-reports">
         <span class="tab-icon">📊</span> Reports & Export
       </button>
-      <button class="nav-tab" data-tab="directory-tab" id="nav-directory">
-        <span class="tab-icon">🗂️</span> Directory
+      <button class="nav-tab" data-tab="enroll-tab" id="nav-enroll">
+        <span class="tab-icon">👤</span> Enroll Student
       </button>
       <button class="nav-tab" data-tab="settings-tab" id="nav-settings">
-        <span class="tab-icon">⚙️</span> Settings
+        <span class="tab-icon">⚙️</span> Settings & Admin
       </button>
     </nav>
   </header>
@@ -71,19 +81,21 @@
   <!-- Main Container -->
   <main class="app-container">
 
-    <!-- TAB 1: LIVE ATTENDANCE -->
+    <!-- ========================================================================= -->
+    <!-- TAB 1: LIVE ATTENDANCE KIOSK -->
+    <!-- ========================================================================= -->
     <section id="attendance-tab" class="tab-content active">
       <!-- Active Lecture Banner -->
       <div id="active-lecture-banner" class="active-lecture-banner" style="display:none;">
         <div class="active-lecture-info">
-          <span class="active-lecture-tag" id="banner-lecture-tag">ACTIVE LECTURE</span>
+          <span class="active-lecture-tag" id="banner-lecture-tag">ACTIVE SESSION</span>
           <div>
-            <div class="active-lecture-title" id="banner-lecture-title">CS101 — Data Structures</div>
-            <div class="active-lecture-meta" id="banner-lecture-meta">Room 101 • Prof. Sharma • Window: 09:55 - 10:15</div>
+            <div class="active-lecture-title" id="banner-lecture-title">CS101 — Advanced Algorithms</div>
+            <div class="active-lecture-meta" id="banner-lecture-meta">Room 101 • Dr. Sharma • Multi-Layer Anti-Proxy Enabled</div>
           </div>
         </div>
         <div class="active-lecture-actions">
-          <button id="btn-banner-mid-check" class="btn btn-secondary btn-sm">⚡ Trigger Mid-Check</button>
+          <button id="btn-banner-scan-qr" class="btn btn-primary btn-sm">📱 Scan Live QR</button>
         </div>
       </div>
 
@@ -100,102 +112,86 @@
           <div class="kpi-icon icon-emerald">✓</div>
           <div class="kpi-info">
             <span class="kpi-label">Present Today</span>
-            <span class="kpi-value" id="kpi-present">0</span>
+            <span class="kpi-value text-emerald" id="kpi-present">0</span>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon icon-amber">⏱️</div>
+          <div class="kpi-icon icon-amber">⏱</div>
           <div class="kpi-info">
-            <span class="kpi-label">Late Today</span>
-            <span class="kpi-value" id="kpi-late">0</span>
+            <span class="kpi-label">Late Arrivals</span>
+            <span class="kpi-value text-amber" id="kpi-late">0</span>
           </div>
         </div>
         <div class="kpi-card">
           <div class="kpi-icon icon-rose">✕</div>
           <div class="kpi-info">
             <span class="kpi-label">Absent Today</span>
-            <span class="kpi-value" id="kpi-absent">0</span>
+            <span class="kpi-value text-rose" id="kpi-absent">0</span>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon icon-indigo">🗓️</div>
+          <div class="kpi-icon icon-purple">📈</div>
           <div class="kpi-info">
-            <span class="kpi-label">Month Active Days</span>
-            <span class="kpi-value" id="kpi-month-pct">0%</span>
-            <span class="kpi-sublabel" id="kpi-month-days">0 Active Days</span>
+            <span class="kpi-label">Monthly Rate</span>
+            <span class="kpi-value text-purple" id="kpi-month-rate">0%</span>
           </div>
         </div>
       </div>
 
-      <!-- Main Live Monitor Workspace -->
-      <div class="attendance-workspace">
-        <!-- Left: Camera Feed & Real-Time Canvas HUD -->
-        <div class="camera-card">
-          <div class="card-header">
-            <div class="header-left">
-              <span class="card-title">Live Vision & Geofence Stream</span>
-              <span class="card-tag">YuNet + ArcFace + GPS</span>
-            </div>
+      <!-- Camera Feed & Attendance Log Grid -->
+      <div class="dashboard-grid">
+        <!-- Live Video Panel -->
+        <div class="card camera-card">
+          <div class="card-header flex-between">
+            <h2 class="card-title">Live Multi-Layer Verification Feed</h2>
             <div class="camera-controls">
-              <button id="btn-camera-toggle" class="btn btn-primary">
-                <span class="btn-icon">▶</span> Start Camera
-              </button>
-              <button id="btn-camera-flip" class="btn btn-ghost" title="Flip camera">🔄</button>
+              <span id="fps-counter" class="mono text-muted text-sm">-- FPS</span>
+              <button id="btn-toggle-camera" class="btn btn-primary btn-sm">Start Camera</button>
             </div>
           </div>
 
           <div class="video-wrapper">
-            <video id="webcam" playsinline autoplay muted></video>
-            <canvas id="hud-canvas"></canvas>
-            <div id="camera-overlay" class="camera-overlay">
-              <div class="overlay-graphic">📷</div>
-              <p>Camera is currently idle</p>
-              <button id="btn-camera-start-overlay" class="btn btn-primary">Start Live Feed</button>
+            <video id="webcam-feed" playsinline autoplay muted></video>
+            <canvas id="detection-canvas"></canvas>
+            <div id="video-overlay-msg" class="video-overlay">Camera Offline</div>
+            <!-- Verification Layer Badge Overlay -->
+            <div id="multi-layer-badges" class="layer-badges-container" style="display:none;">
+              <span class="layer-badge" id="badge-face">Face: --</span>
+              <span class="layer-badge" id="badge-liveness">Liveness: --</span>
+              <span class="layer-badge" id="badge-geofence">GPS: --</span>
+              <span class="layer-badge" id="badge-qr">QR: --</span>
             </div>
-            <!-- HUD Scanline overlay -->
-            <div class="hud-scanline"></div>
           </div>
 
-          <!-- Bottom Stream Stats & Tips -->
           <div class="camera-footer">
-            <div class="stream-metric">
-              <span class="metric-label">FPS:</span>
-              <span class="metric-val" id="stream-fps">0</span>
-            </div>
-            <div class="stream-metric">
-              <span class="metric-label">GPS:</span>
-              <span class="metric-val text-cyan" id="stream-gps-status">📍 Acquiring GPS...</span>
-            </div>
-            <div class="stream-metric">
-              <span class="metric-label">Liveness:</span>
-              <span class="metric-val text-emerald" id="liveness-status">Active</span>
+            <div class="geo-live-info mono text-sm" id="client-coords-display">
+              📍 Device Location: Fetching GPS coordinates...
             </div>
           </div>
         </div>
 
-        <!-- Right: Real-time Attendance Feed -->
-        <div class="feed-card">
-          <div class="card-header">
-            <span class="card-title">Today's Live Attendance Feed</span>
-            <button id="btn-refresh-feed" class="btn btn-ghost btn-sm">↻ Refresh</button>
+        <!-- Live Attendance Stream Table -->
+        <div class="card">
+          <div class="card-header flex-between">
+            <div>
+              <h2 class="card-title">Live Presence Stream</h2>
+              <p class="card-sub">Real-time contactless verification logs</p>
+            </div>
+            <button id="btn-clear-today" class="btn btn-ghost btn-sm">Clear Today</button>
           </div>
-
           <div class="table-container">
-            <table class="data-table" id="today-table">
+            <table class="data-table" id="live-table">
               <thead>
                 <tr>
                   <th>Roll No</th>
                   <th>Name</th>
-                  <th>Time</th>
                   <th>Status</th>
-                  <th>Month Att.</th>
-                  <th>Confidence</th>
+                  <th>Time</th>
+                  <th>Method</th>
                 </tr>
               </thead>
-              <tbody id="today-table-body">
-                <tr class="empty-row">
-                  <td colspan="6">No attendance marked yet today.</td>
-                </tr>
+              <tbody id="live-table-body">
+                <tr class="empty-row"><td colspan="5">No attendance marked yet today.</td></tr>
               </tbody>
             </table>
           </div>
@@ -203,349 +199,496 @@
       </div>
     </section>
 
-    <!-- TAB 2: LECTURES & ANTI-BUNKING (Phase 21) -->
-    <section id="lectures-tab" class="tab-content">
-      <div class="lectures-grid">
-        <!-- Schedule Lecture Form -->
+    <!-- ========================================================================= -->
+    <!-- TAB 2: TEACHER PORTAL -->
+    <!-- ========================================================================= -->
+    <section id="teacher-tab" class="tab-content">
+      <div class="grid-2col">
+        <!-- Start Session Card -->
         <div class="card">
           <div class="card-header">
-            <div>
-              <h2 class="card-title">Schedule New Lecture</h2>
-              <p class="card-sub">Default duration: 50 minutes (Configurable)</p>
-            </div>
+            <h2 class="card-title">Start Dynamic Attendance Session</h2>
+            <p class="card-sub">Generates cryptographic rotating QR tokens & enables location check</p>
           </div>
-          <form id="lecture-form" class="form-layout">
+          <form id="start-session-form" class="form-layout">
             <div class="form-group">
-              <label for="lec-course-code">Course Code *</label>
-              <input type="text" id="lec-course-code" placeholder="e.g. CS101" required autocomplete="off">
-            </div>
-            <div class="form-group">
-              <label for="lec-subject-name">Subject Name *</label>
-              <input type="text" id="lec-subject-name" placeholder="e.g. Data Structures & Algorithms" required autocomplete="off">
+              <label for="sess-subject-select">Assigned Subject</label>
+              <select id="sess-subject-select" class="form-control" required>
+                <option value="">-- Select Subject --</option>
+              </select>
             </div>
             <div class="form-group">
-              <label for="lec-instructor">Instructor Name *</label>
-              <input type="text" id="lec-instructor" placeholder="e.g. Prof. Rohit Sharma" required autocomplete="off">
+              <label for="sess-classroom-select">Classroom / Hall</label>
+              <select id="sess-classroom-select" class="form-control" required>
+                <option value="">-- Select Classroom --</option>
+              </select>
             </div>
-            <div class="form-group">
-              <label for="lec-date">Lecture Date *</label>
-              <input type="date" id="lec-date" class="input-date" required>
-            </div>
-            <div class="form-group">
-              <label for="lec-start-time">Start Time *</label>
-              <input type="time" id="lec-start-time" class="input-date" required>
-            </div>
-            <div class="form-group">
-              <label for="lec-duration">Duration (Minutes) *</label>
-              <input type="number" id="lec-duration" value="50" min="15" max="240" required>
-              <small class="form-hint">Default institutional duration is 50 minutes.</small>
-            </div>
-            <div class="form-group">
-              <label for="lec-room">Classroom / Room</label>
-              <input type="text" id="lec-room" placeholder="e.g. Room 101" value="Room 101">
-            </div>
-            <button type="submit" id="btn-submit-lecture" class="btn btn-primary btn-block">
-              📅 Schedule Lecture
-            </button>
-          </form>
-        </div>
-
-        <!-- Scheduled Lectures List & Management -->
-        <div class="card">
-          <div class="card-header flex-between">
-            <div>
-              <h2 class="card-title">Scheduled Lectures & Sessions</h2>
-              <p class="card-sub">Manage attendance windows & anti-bunking checks</p>
-            </div>
-            <button id="btn-refresh-lectures" class="btn btn-ghost btn-sm">↻ Refresh</button>
-          </div>
-
-          <div id="lectures-container" class="lectures-list">
-            <p class="text-muted" style="padding: 1rem;">Loading scheduled lectures...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Anti-Bunking Analytics Overview -->
-      <div class="card" style="margin-top: 1.5rem;">
-        <div class="card-header">
-          <h2 class="card-title">Anti-Bunking & Lecture Analytics</h2>
-          <p class="card-sub">Student-wise percentage, subject attendance, and mid-check audit</p>
-        </div>
-        <div class="table-container">
-          <table class="data-table" id="analytics-table">
-            <thead>
-              <tr>
-                <th>Roll No</th>
-                <th>Student Name</th>
-                <th>Dept</th>
-                <th>Lectures Attended</th>
-                <th>Missed Lectures</th>
-                <th>Late Arrivals</th>
-                <th>Mid-Checks Verified</th>
-                <th>Overall Attendance %</th>
-              </tr>
-            </thead>
-            <tbody id="analytics-table-body">
-              <tr class="empty-row"><td colspan="8">Loading analytics...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 3: ENROLL STUDENT (Phases 18, 19, 20) -->
-    <section id="enroll-tab" class="tab-content">
-      <div class="enroll-grid">
-        <!-- Form Section -->
-        <div class="card enroll-form-card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">Enroll New Student</h2>
-              <p class="card-sub">Enforces strict email, name, and numeric ID formatting</p>
-            </div>
-          </div>
-
-          <form id="enroll-form" class="form-layout">
-            <div class="form-group">
-              <label for="enroll-roll">Roll ID / Student ID *</label>
-              <input type="text" id="enroll-roll" placeholder="e.g. 20261001 (Digits only)" required autocomplete="off">
-              <small class="form-hint">Only numeric digits (0-9). Leading zeros are preserved.</small>
-              <span id="err-enroll-roll" class="input-error-msg"></span>
-            </div>
-
-            <div class="form-group">
-              <label for="enroll-name">Full Name *</label>
-              <input type="text" id="enroll-name" placeholder="e.g. Rohit Pathak or ROHIT PATHAK" required autocomplete="off">
-              <small class="form-hint">Title Case (Rohit Pathak) or UPPERCASE (ROHIT PATHAK). No numbers.</small>
-              <span id="err-enroll-name" class="input-error-msg"></span>
-            </div>
-
-            <div class="form-group">
-              <label for="enroll-dept">Department</label>
-              <input type="text" id="enroll-dept" placeholder="e.g. Computer Science" value="General">
-            </div>
-
-            <div class="form-group">
-              <label for="enroll-email">Email Address</label>
-              <input type="email" id="enroll-email" placeholder="e.g. rohit123@college.edu">
-              <small class="form-hint">Lowercase alphanumeric local part only (a-z, 0-9). No uppercase or symbols.</small>
-              <span id="err-enroll-email" class="input-error-msg"></span>
-            </div>
-
-            <div class="form-actions">
-              <button type="submit" id="btn-submit-enroll" class="btn btn-primary btn-block">
-                💾 Register Student & Face
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Face Capture & Preview Section -->
-        <div class="card enroll-capture-card">
-          <div class="card-header">
-            <span class="card-title">Face Snapshot</span>
-            <span class="card-tag">Required</span>
-          </div>
-
-          <div class="capture-box">
-            <div class="preview-stage">
-              <video id="enroll-video" autoplay playsinline muted></video>
-              <canvas id="enroll-canvas" style="display:none;"></canvas>
-              <img id="enroll-preview-img" alt="Captured Face" style="display:none;">
-              <div id="enroll-placeholder" class="enroll-placeholder">
-                <span>📸</span>
-                <p>Position face squarely in frame</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="sess-qr-expiry">QR Expiry (Seconds)</label>
+                <input type="number" id="sess-qr-expiry" value="30" min="15" max="120" required>
+              </div>
+              <div class="form-group" style="padding-top: 1.8rem;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="sess-req-location" checked> Require Geofence Check
+                </label>
               </div>
             </div>
+            <button type="submit" class="btn btn-primary">🚀 Launch Live Session</button>
+          </form>
+        </div>
 
-            <div class="capture-actions">
-              <button type="button" id="btn-enroll-cam-toggle" class="btn btn-secondary">
-                Turn On Camera
-              </button>
-              <button type="button" id="btn-enroll-snap" class="btn btn-primary" disabled>
-                📸 Snap Photo
-              </button>
-              <label class="btn btn-ghost file-input-label">
-                📁 Upload Photo
-                <input type="file" id="enroll-file-input" accept="image/*" style="display:none;">
-              </label>
+        <!-- Live Rotating QR Monitor -->
+        <div class="card" id="teacher-qr-monitor-card">
+          <div class="card-header flex-between">
+            <h2 class="card-title">Classroom Live QR Display</h2>
+            <span class="active-lecture-tag" id="qr-session-status">NO ACTIVE SESSION</span>
+          </div>
+          <div class="qr-display-container text-center" style="padding: 2rem;">
+            <div id="qr-code-box" class="qr-box">
+              <p class="text-muted" id="qr-placeholder-text">Start a session to project rotating dynamic QR codes to the class.</p>
+              <div id="qr-token-string" class="mono text-xs text-cyan" style="word-break: break-all; margin-top: 1rem; display:none;"></div>
             </div>
+            <div id="qr-timer-bar" class="progress-bar-container" style="display:none; margin-top: 1.5rem;">
+              <div id="qr-timer-fill" class="progress-bar-fill" style="width: 100%;"></div>
+            </div>
+            <p id="qr-timer-text" class="text-sm text-amber mono" style="margin-top: 0.5rem; display:none;">Rotating in 30s...</p>
+            <button id="btn-end-teacher-session" class="btn btn-danger btn-sm" style="margin-top: 1rem; display:none;">End Session</button>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- TAB 4: REPORTS & CSV EXPORT -->
-    <section id="reports-tab" class="tab-content">
-      <div class="card reports-card">
+      <!-- Student Leave Approvals for Teacher -->
+      <div class="card" style="margin-top: 1.5rem;">
         <div class="card-header flex-between">
           <div>
-            <h2 class="card-title">Attendance Reports & Logs</h2>
-            <p class="card-sub">Filter records by date and export clean audit sheets</p>
+            <h2 class="card-title">Student Leave Applications Pending Review</h2>
+            <p class="card-sub">Approve or reject medical, official, or personal leave requests</p>
           </div>
-
-          <div class="reports-controls">
-            <input type="date" id="report-date-picker" class="input-date">
-            <button id="btn-load-report" class="btn btn-secondary">🔍 Load Records</button>
-            <button id="btn-export-csv" class="btn btn-primary">📥 Export CSV</button>
-          </div>
+          <button id="btn-refresh-teacher-leaves" class="btn btn-ghost btn-sm">↻ Refresh</button>
         </div>
-
-        <div class="table-container report-table-wrap">
-          <table class="data-table" id="report-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Roll No</th>
-                <th>Name</th>
-                <th>Department</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Status</th>
-                <th>Confidence</th>
-              </tr>
-            </thead>
-            <tbody id="report-table-body">
-              <tr class="empty-row">
-                <td colspan="8">Select a date and click 'Load Records'.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 5: STUDENT DIRECTORY -->
-    <section id="directory-tab" class="tab-content">
-      <div class="card directory-card">
-        <div class="card-header flex-between">
-          <div>
-            <h2 class="card-title">Registered Students Directory</h2>
-            <p class="card-sub">Active facial profiles with ArcFace embeddings</p>
-          </div>
-          <div class="directory-search-wrap">
-            <input type="text" id="directory-search" class="input-search"
-              placeholder="Search by name or roll number...">
-          </div>
-        </div>
-
         <div class="table-container">
-          <table class="data-table" id="directory-table">
+          <table class="data-table">
             <thead>
               <tr>
-                <th>Roll No</th>
-                <th>Name</th>
-                <th>Department</th>
-                <th>Month Att. (Active Days)</th>
-                <th>Email</th>
-                <th>Enrolled Date</th>
+                <th>Student</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Reason</th>
+                <th>Submitted</th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="directory-table-body">
-              <tr class="empty-row">
-                <td colspan="7">Loading enrolled students...</td>
-              </tr>
+            <tbody id="teacher-leaves-tbody">
+              <tr class="empty-row"><td colspan="7">No pending leave requests.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- TAB 6: SETTINGS & ADMINISTRATOR CONTROLS (Phases 17, 22) -->
-    <section id="settings-tab" class="tab-content">
-      <!-- Admin Login Status / Auth Banner -->
-      <div id="admin-auth-banner" class="card" style="margin-bottom: 1.5rem; background: rgba(30, 42, 66, 0.6);">
-        <div class="flex-between">
-          <div>
-            <span class="card-title" id="admin-auth-status">🔒 Admin Session: Authenticated</span>
-            <p class="card-sub">Authorized to modify campus coordinates, radius, and attendance policies</p>
+    <!-- ========================================================================= -->
+    <!-- TAB 3: STUDENT PORTAL -->
+    <!-- ========================================================================= -->
+    <section id="student-tab" class="tab-content">
+      <!-- Student Profile & Status Summary -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon icon-cyan">🎓</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Overall Attendance</span>
+            <span class="kpi-value text-emerald" id="student-kpi-overall">--%</span>
           </div>
-          <button id="btn-admin-relogin" class="btn btn-ghost btn-sm">🔑 Relogin / Switch Admin</button>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-purple">📚</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Classes Attended</span>
+            <span class="kpi-value" id="student-kpi-attended">0 / 0</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-amber">🔮</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Predicted Final %</span>
+            <span class="kpi-value text-cyan" id="student-kpi-predicted">--%</span>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon icon-rose">⚠️</div>
+          <div class="kpi-info">
+            <span class="kpi-label">Needed for 75%</span>
+            <span class="kpi-value text-amber" id="student-kpi-needed">0</span>
+          </div>
         </div>
       </div>
 
-      <div class="settings-grid">
-        <!-- Campus Geofence Configuration Card (Phase 17) -->
+      <!-- Warning Alert Banner if Shortage -->
+      <div id="student-shortage-alert" class="card" style="display:none; border-color: var(--danger); background: rgba(244, 63, 94, 0.1); margin-bottom: 1.5rem;">
+        <h3 class="card-title text-rose">⚠️ Attendance Shortage Warning</h3>
+        <p id="student-shortage-msg" class="text-sm" style="margin-top: 0.25rem;">Your attendance is below the mandatory 75% threshold. Please review the recovery requirements.</p>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Subject Breakdown Table -->
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Campus Location & Geofencing</h2>
-            <p class="card-sub">Default radius is 30m (Configurable to 50m)</p>
+            <h2 class="card-title">Subject-Wise Attendance Breakdown</h2>
+            <p class="card-sub">Attendance status per enrolled subject</p>
           </div>
-          <form id="geofence-form" class="form-layout">
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Conducted</th>
+                  <th>Attended</th>
+                  <th>Percentage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="student-subjects-tbody">
+                <tr class="empty-row"><td colspan="5">Loading subjects...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Submit Leave Application -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Submit Leave Application</h2>
+            <p class="card-sub">Apply for medical, official, or personal leave</p>
+          </div>
+          <form id="student-leave-form" class="form-layout">
             <div class="form-group">
-              <label for="cfg-campus-name">Campus Name</label>
-              <input type="text" id="cfg-campus-name" value="Main Campus" required>
+              <label for="leave-type">Leave Category</label>
+              <select id="leave-type" class="form-control" required>
+                <option value="MEDICAL">Medical Leave</option>
+                <option value="OFFICIAL">Official / College Duty</option>
+                <option value="PERSONAL">Personal / Emergency</option>
+                <option value="BEREAVEMENT">Bereavement</option>
+              </select>
             </div>
-            <div class="form-group">
-              <label for="cfg-campus-lat">Campus Latitude (Degrees)</label>
-              <input type="number" id="cfg-campus-lat" step="0.000001" value="28.535500" required>
-            </div>
-            <div class="form-group">
-              <label for="cfg-campus-lon">Campus Longitude (Degrees)</label>
-              <input type="number" id="cfg-campus-lon" step="0.000001" value="77.391000" required>
-            </div>
-            <div class="form-group">
-              <label>Allowed Attendance Radius</label>
-              <div class="radius-btn-group">
-                <button type="button" class="radius-btn active" data-radius="30">30m (Default)</button>
-                <button type="button" class="radius-btn" data-radius="50">50m (Extended)</button>
-                <button type="button" class="radius-btn" data-radius="custom">Custom</button>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="leave-from-date">From Date</label>
+                <input type="date" id="leave-from-date" required>
               </div>
-              <input type="number" id="cfg-campus-radius" value="30" min="5" max="1000" step="1" style="margin-top:0.5rem;" required>
-              <small class="form-hint">Important: Default radius is 30 meters.</small>
+              <div class="form-group">
+                <label for="leave-to-date">To Date</label>
+                <input type="date" id="leave-to-date" required>
+              </div>
             </div>
             <div class="form-group">
-              <label for="cfg-campus-accuracy">GPS Accuracy Threshold (Meters)</label>
-              <input type="number" id="cfg-campus-accuracy" value="50" min="5" max="200" required>
-              <small class="form-hint">Readings with GPS error larger than this will be rejected.</small>
+              <label for="leave-reason">Reason & Supporting Details</label>
+              <textarea id="leave-reason" rows="3" class="form-control" placeholder="Provide reason for absence..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit Leave Application</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: PARENT PORTAL -->
+    <!-- ========================================================================= -->
+    <section id="parent-tab" class="tab-content">
+      <div class="card">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Ward Attendance Overview</h2>
+            <p class="card-sub">Monitor student attendance status, shortage warnings, and daily records</p>
+          </div>
+          <button id="btn-refresh-parent-wards" class="btn btn-ghost btn-sm">↻ Refresh</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ward Name</th>
+                <th>Roll Number</th>
+                <th>Department</th>
+                <th>Total Classes</th>
+                <th>Attended</th>
+                <th>Percentage</th>
+                <th>Standing</th>
+              </tr>
+            </thead>
+            <tbody id="parent-wards-tbody">
+              <tr class="empty-row"><td colspan="7">Loading ward records...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 5: AI & PREDICTIVE ANALYTICS -->
+    <!-- ========================================================================= -->
+    <section id="analytics-tab" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <h2 class="card-title">🧠 SmartAttend AI Governance & Advisory Notice</h2>
+        </div>
+        <p class="text-sm text-muted">
+          All predictive machine learning insights are advisory indicators for academic counselors, faculty, and students.
+          In accordance with strict institutional policies, AI predictions <strong>must never automatically apply disciplinary actions</strong>.
+        </p>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Department Comparative Analytics -->
+        <div class="card">
+          <div class="card-header flex-between">
+            <h2 class="card-title">Department Comparative Analytics</h2>
+            <button id="btn-refresh-dept-analytics" class="btn btn-ghost btn-sm">↻ Refresh</button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Department</th>
+                  <th>Enrolled</th>
+                  <th>Avg Attendance</th>
+                  <th>At Risk (&lt;75%)</th>
+                </tr>
+              </thead>
+              <tbody id="dept-analytics-tbody">
+                <tr class="empty-row"><td colspan="4">Loading analytics...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Monthly Trend Analysis -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Monthly Institutional Trends</h2>
+            <p class="card-sub">6-Month historical attendance momentum</p>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Total Marked</th>
+                  <th>Present</th>
+                  <th>Rate</th>
+                  <th>Momentum</th>
+                </tr>
+              </thead>
+              <tbody id="monthly-trends-tbody">
+                <tr class="empty-row"><td colspan="5">Loading trends...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 6: SECURITY & REVIEWS -->
+    <!-- ========================================================================= -->
+    <section id="security-tab" class="tab-content">
+      <!-- Borderline Presence Review Queue -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header flex-between">
+          <div>
+            <h2 class="card-title">Borderline Presence Verification Queue (Manual Review)</h2>
+            <p class="card-sub">Resolves ambiguous GPS jitter or borderline biometric scores without penalizing students</p>
+          </div>
+          <button id="btn-refresh-reviews" class="btn btn-ghost btn-sm">↻ Refresh Queue</button>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Roll No</th>
+                <th>Reason Flagged</th>
+                <th>Distance</th>
+                <th>Face Score</th>
+                <th>Timestamp</th>
+                <th>Review Action</th>
+              </tr>
+            </thead>
+            <tbody id="reviews-tbody">
+              <tr class="empty-row"><td colspan="7">No pending verification reviews.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Fixed Classroom Cameras -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Registered Classroom Cameras</h2>
+            <p class="card-sub">Fixed authenticated camera devices</p>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>UID</th>
+                  <th>Name</th>
+                  <th>Classroom</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="cameras-tbody">
+                <tr class="empty-row"><td colspan="4">Loading cameras...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- BLE Beacons -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Registered Bluetooth Beacons</h2>
+            <p class="card-sub">Proximity beacons for classroom presence verification</p>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>UUID</th>
+                  <th>Name</th>
+                  <th>Classroom</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="beacons-tbody">
+                <tr class="empty-row"><td colspan="4">Loading beacons...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 7: REPORTS & SAFE EXPORTS -->
+    <!-- ========================================================================= -->
+    <section id="reports-tab" class="tab-content">
+      <div class="grid-2col">
+        <!-- Export Actions Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Safe Export Utilities</h2>
+            <p class="card-sub">Protected against CSV Formula Injection (CWE-1236)</p>
+          </div>
+          <div class="export-actions" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+            <a href="/api/reports/attendance/csv" class="btn btn-primary" download>
+              📥 Download Attendance Ledger (CSV)
+            </a>
+            <a href="/api/reports/students/csv" class="btn btn-secondary" download>
+              📥 Download Student Compliance Summary (CSV)
+            </a>
+          </div>
+        </div>
+
+        <!-- Filtered Attendance History -->
+        <div class="card">
+          <div class="card-header flex-between">
+            <h2 class="card-title">Filter Attendance Records</h2>
+            <input type="date" id="reports-date-filter" class="form-control" style="max-width: 180px;">
+          </div>
+          <div class="table-container" style="max-height: 400px;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Roll No</th>
+                  <th>Name</th>
+                  <th>Subject</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="reports-table-body">
+                <tr class="empty-row"><td colspan="5">Select a date to view records.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 8: ENROLL STUDENT -->
+    <!-- ========================================================================= -->
+    <section id="enroll-tab" class="tab-content">
+      <div class="grid-2col">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Register New Student</h2>
+            <p class="card-sub">Extracts 128-D facial embeddings and validates institutional credentials</p>
+          </div>
+          <form id="enroll-form" class="form-layout">
+            <div class="form-group">
+              <label for="enroll-roll">Numeric Roll Number (Digits 0-9)</label>
+              <input type="text" id="enroll-roll" placeholder="e.g. 20260012" required>
             </div>
             <div class="form-group">
-              <label>
-                <input type="checkbox" id="cfg-geofence-enabled" checked>
-                Enable Strict Geofence Verification
+              <label for="enroll-name">Student Full Name</label>
+              <input type="text" id="enroll-name" placeholder="e.g. Rahul Sharma" required>
+            </div>
+            <div class="form-group">
+              <label for="enroll-dept">Department</label>
+              <input type="text" id="enroll-dept" value="Computer Science" required>
+            </div>
+            <div class="form-group">
+              <label for="enroll-email">Institutional Email</label>
+              <input type="email" id="enroll-email" placeholder="e.g. rahul@college.edu" required>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="enroll-admin-override"> Admin Name Override (Allow irregular capitalization)
               </label>
             </div>
-            <button type="submit" class="btn btn-primary">Save Geofence Configuration</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-enroll">Capture Face & Enroll</button>
           </form>
         </div>
 
-        <!-- Lecture Policies & Institutional Settings Card (Phase 21, 22) -->
         <div class="card">
           <div class="card-header">
-            <h2 class="card-title">Lecture Policies & Timings</h2>
-            <p class="card-sub">Attendance windows & anti-bunking defaults</p>
+            <h2 class="card-title">Enrollment Face Preview</h2>
           </div>
-          <form id="policies-form" class="form-layout">
+          <div class="video-wrapper">
+            <video id="enroll-webcam" playsinline autoplay muted></video>
+            <canvas id="enroll-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 9: SETTINGS & ADMIN -->
+    <!-- ========================================================================= -->
+    <section id="settings-tab" class="tab-content">
+      <div class="grid-2col">
+        <!-- Geofence & Campus Settings -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">College Geofencing & Campus Settings</h2>
+          </div>
+          <form id="settings-form" class="form-layout">
             <div class="form-group">
-              <label for="cfg-lecture-duration">Default Lecture Duration (Minutes)</label>
-              <input type="number" id="cfg-lecture-duration" value="50" min="15" max="180" required>
-              <small class="form-hint">Default duration for every scheduled lecture is 50 minutes.</small>
+              <label for="set-campus-lat">Campus Latitude</label>
+              <input type="number" step="0.000001" id="set-campus-lat" value="28.5355" required>
             </div>
             <div class="form-group">
-              <label for="cfg-window-before">Attendance Opens Before Start (Mins)</label>
-              <input type="number" id="cfg-window-before" value="5" min="0" max="60" required>
+              <label for="set-campus-lon">Campus Longitude</label>
+              <input type="number" step="0.000001" id="set-campus-lon" value="77.3910" required>
             </div>
             <div class="form-group">
-              <label for="cfg-window-after">Attendance Closes After Start (Mins)</label>
-              <input type="number" id="cfg-window-after" value="15" min="1" max="120" required>
+              <label for="set-radius">Allowed Radius (Meters)</label>
+              <input type="number" id="set-radius" value="30" min="5" max="1000" required>
             </div>
-            <div class="form-group">
-              <label for="cfg-late-cutoff">Late Cutoff Threshold (Mins)</label>
-              <input type="number" id="cfg-late-cutoff" value="10" min="1" max="60" required>
-            </div>
-            <div class="form-group">
-              <label for="cfg-timezone">Campus Timezone</label>
-              <input type="text" id="cfg-timezone" value="Asia/Kolkata" required>
-            </div>
-            <div class="form-group">
-              <label>
-                <input type="checkbox" id="cfg-numeric-roll" checked>
-                Enforce Numeric-Only Student Roll IDs (0-9)
-              </label>
-            </div>
-            <button type="submit" class="btn btn-primary">Update Institutional Policies</button>
+            <button type="submit" class="btn btn-primary">Save Geofence Settings</button>
           </form>
         </div>
 
@@ -564,45 +707,20 @@
               <input type="password" id="admin-old-pass" placeholder="••••••••" required>
             </div>
             <div class="form-group">
-              <label for="admin-new-pass">New Password</label>
+              <label for="admin-new-pass">New Password (Min 8 Chars, Upper, Lower, Digit)</label>
               <input type="password" id="admin-new-pass" placeholder="••••••••" required>
             </div>
             <button type="submit" class="btn btn-primary">Update Password</button>
           </form>
         </div>
-
-        <!-- System & Cloud Diagnostics -->
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">Diagnostics & GPS Limitations</h2>
-          </div>
-          <div class="diagnostics-list">
-            <div class="diag-item">
-              <span class="diag-label">Geofence Radius:</span>
-              <span class="diag-val text-cyan" id="diag-radius">30 Meters (Default)</span>
-            </div>
-            <div class="diag-item">
-              <span class="diag-label">Lecture Default:</span>
-              <span class="diag-val text-emerald">50 Minutes</span>
-            </div>
-            <div class="diag-item">
-              <span class="diag-label">GPS Security:</span>
-              <span class="diag-val text-amber">Proximity indicator (spoofing possible)</span>
-            </div>
-            <div class="diag-item">
-              <span class="diag-label">Indoor Accuracy:</span>
-              <span class="diag-val">Threshold ±50m with re-reading prompt</span>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- Audit Logs Table (Phase 17, 22) -->
+      <!-- Security Audit Trail -->
       <div class="card" style="margin-top: 1.5rem;">
         <div class="card-header flex-between">
           <div>
-            <h2 class="card-title">Administrative & Security Audit Trail</h2>
-            <p class="card-sub">Tracks setting adjustments, attendance corrections, and geofence events</p>
+            <h2 class="card-title">Security & System Audit Trail</h2>
+            <p class="card-sub">Tracks logins, attendance verifications, and parameter adjustments</p>
           </div>
           <button id="btn-refresh-audit" class="btn btn-ghost btn-sm">↻ Refresh Logs</button>
         </div>
@@ -627,54 +745,37 @@
 
   </main>
 
-  <!-- Lecture Attendance Report & Correction Modal -->
-  <div id="lecture-modal" class="modal-overlay">
-    <div class="modal-card">
+  <!-- Login / Role Switch Modal -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 420px;">
       <div class="card-header flex-between">
-        <div>
-          <h2 class="card-title" id="modal-lecture-title">Lecture Details</h2>
-          <p class="card-sub" id="modal-lecture-sub">Attendance Breakdown & Anti-Bunking Log</p>
-        </div>
-        <button id="btn-close-modal" class="btn btn-ghost">✕</button>
+        <h2 class="card-title">SmartAttend Authentication</h2>
+        <button id="btn-close-login-modal" class="btn btn-ghost">✕</button>
       </div>
-
-      <div class="kpi-grid" style="margin-bottom: 1rem;">
-        <div class="kpi-card">
-          <div class="kpi-info"><span class="kpi-label">Present</span><span class="kpi-value text-emerald" id="modal-kpi-present">0</span></div>
+      <form id="modal-login-form" class="form-layout" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label for="modal-login-role">Select Role</label>
+          <select id="modal-login-role" class="form-control" required>
+            <option value="ADMIN">Administrator</option>
+            <option value="TEACHER">Faculty / Teacher</option>
+            <option value="STUDENT">Student</option>
+            <option value="PARENT">Parent</option>
+          </select>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-info"><span class="kpi-label">Late</span><span class="kpi-value text-amber" id="modal-kpi-late">0</span></div>
+        <div class="form-group">
+          <label for="modal-login-username" id="modal-login-user-label">Username / Roll No / Email</label>
+          <input type="text" id="modal-login-username" required>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-info"><span class="kpi-label">Absent</span><span class="kpi-value text-rose" id="modal-kpi-absent">0</span></div>
+        <div class="form-group">
+          <label for="modal-login-password">Password</label>
+          <input type="password" id="modal-login-password" required>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-info"><span class="kpi-label">Mid-Checked</span><span class="kpi-value text-cyan" id="modal-kpi-mid">0</span></div>
-        </div>
-      </div>
-
-      <div class="table-container" style="max-height: 350px;">
-        <table class="data-table" id="modal-student-table">
-          <thead>
-            <tr>
-              <th>Roll No</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Time</th>
-              <th>Mid-Check</th>
-              <th>Distance</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody id="modal-student-tbody">
-            <tr class="empty-row"><td colspan="7">Loading...</td></tr>
-          </tbody>
-        </table>
-      </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+      </form>
     </div>
   </div>
 
-  <script src="/static/app.js?v=3.0"></script>
+  <script src="/static/app.js?v=4.0"></script>
 </body>
 
 </html>

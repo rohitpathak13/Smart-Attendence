@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-10-13 22:07:31",
+  "total_students": 2,
+  "valid_count": 1,
+  "legacy_rejected_count": 1,
+  "valid_records": [
+    {
+      "id": 2,
+      "roll_no": "2",
+      "name": "Suraj Kumar",
+      "department": "Computer Science(Aiml)",
+      "email": "xyz@gmail.com",
+      "created_at": "2026-09-10 08:12:24"
+    }
+  ],
+  "rejected_legacy_records": [
+    {
+      "id": 1,
+      "roll_no": "1",
+      "name": "Rohit Pathak",
+      "department": "Computer Science",
+      "email": "",
+      "created_at": "2026-09-08 18:54:02",
+      "review_reasons": [
+        "Email Missing: Student record has no email address configured."
+      ]
+    }
+  ]
+}

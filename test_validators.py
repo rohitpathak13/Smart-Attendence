@@ -82,7 +82,7 @@ class TestValidators(unittest.TestCase):
     # PHASE 19: STUDENT NAME VALIDATION TESTS
     # =========================================================================
     def test_valid_student_names(self):
-        # Title Case and ALL UPPERCASE
+        # Title Case and ALL UPPERCASE, including initials with dots, hyphens, apostrophes
         valid_cases = [
             ("Rohit", "Rohit"),
             ("Rohit Pathak", "Rohit Pathak"),
@@ -91,7 +91,10 @@ class TestValidators(unittest.TestCase):
             ("Mary Jane Watson", "Mary Jane Watson"),
             ("ALICE SMITH", "ALICE SMITH"),
             ("O'Connor", "O'Connor"),
-            ("Smith-Jones", "Smith-Jones")
+            ("Smith-Jones", "Smith-Jones"),
+            ("Rohit K. Pathak", "Rohit K. Pathak"),
+            ("J.K. Rowling", "J.K. Rowling"),
+            ("A. P. J. Abdul Kalam", "A. P. J. Abdul Kalam")
         ]
         for name_in, expected_norm in valid_cases:
             is_valid, norm, msg = validate_student_name(name_in)
