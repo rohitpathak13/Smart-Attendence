@@ -1703,4 +1703,24 @@ def serve_index():
 
 if __name__ == "__main__":
     import uvicorn
+    import webbrowser
+    import threading
+
+    def open_browser():
+        time.sleep(1.5)
+        try:
+            webbrowser.open(f"http://localhost:{PORT}")
+        except Exception:
+            pass
+
+    print("\n" + "=" * 65)
+    print(" 🚀 SmartAttend AI Server Started Successfully!")
+    print("=" * 65)
+    print(f" 👉 Open in your browser:  http://localhost:{PORT}")
+    print(f" 👉 Loopback address:      http://127.0.0.1:{PORT}")
+    print(" ⚠️  WINDOWS NOTE: Do NOT type 0.0.0.0 in your browser.")
+    print("    Always use http://localhost:8000 or http://127.0.0.1:8000")
+    print("=" * 65 + "\n")
+
+    threading.Thread(target=open_browser, daemon=True).start()
     uvicorn.run("server:app", host=HOST, port=PORT, reload=False)

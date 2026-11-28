@@ -13,6 +13,12 @@ from typing import Tuple, List, Dict, Optional, Any
 
 EARTH_RADIUS_METERS = 6371000.0  # WGS-84 mean Earth radius in meters
 
+# Configured default college coordinates and allowable radius (under 100 meters)
+DEFAULT_CAMPUS_LAT = 26.6407955
+DEFAULT_CAMPUS_LON = 80.9371554
+DEFAULT_GEOFENCE_RADIUS_METERS = 100.0  # Under 100 meter range
+DEFAULT_CAMPUS_NAME = "Ambalika Institute of Management and Technology"
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Calculates the great-circle distance between two points on the Earth's surface
@@ -34,6 +40,22 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
 
     return EARTH_RADIUS_METERS * c
+
+def is_within_geofence(
+    student_lat: float,
+    student_lon: float,
+    center_lat: float = DEFAULT_CAMPUS_LAT,
+    center_lon: float = DEFAULT_CAMPUS_LON,
+    radius_meters: float = DEFAULT_GEOFENCE_RADIUS_METERS
+) -> Tuple[bool, float]:
+    """
+    Checks if given student coordinates fall within the allowable radius of the campus center.
+
+    Returns:
+        (is_inside, distance_meters)
+    """
+    dist = haversine_distance(student_lat, student_lon, center_lat, center_lon)
+    return (round(dist, 2) <= round(radius_meters, 2)), round(dist, 2)
 
 def validate_coordinates(lat: Any, lon: Any) -> Tuple[bool, Optional[float], Optional[float], str]:
     """
@@ -65,7 +87,7 @@ def verify_student_location(
     student_lat: Optional[float],
     student_lon: Optional[float],
     accuracy_meters: Optional[float],
-    campuses: List[Dict[str, Any]],
+    campuses: Optional[List[Dict[str, Any]]] = None,
     accuracy_threshold_meters: float = 50.0,
     geofence_enabled: bool = True
 ) -> Tuple[bool, str, Dict[str, Any]]:
@@ -78,6 +100,7 @@ def verify_student_location(
         accuracy_meters: Reported GPS accuracy radius in meters (from Geolocation API).
         campuses: List of active campus configurations. Each must have:
                   'id', 'name', 'latitude', 'longitude', 'radius_meters'.
+                  If omitted or empty, defaults to configured college campus.
         accuracy_threshold_meters: Max acceptable GPS accuracy error (default 50.0m).
         geofence_enabled: Global or institutional toggle for geofencing.
 
@@ -119,8 +142,19 @@ def verify_student_location(
         except (ValueError, TypeError):
             pass
 
-    # 3. Check registered campuses
-    active_campuses = [c for c in campuses if c.get("is_active", 1)]
+    # 3. Check registered campuses or fallback to default campus
+    if campuses is None or len(campuses) == 0:
+        active_campuses = [{
+            "id": 1,
+            "name": DEFAULT_CAMPUS_NAME,
+            "latitude": DEFAULT_CAMPUS_LAT,
+            "longitude": DEFAULT_CAMPUS_LON,
+            "radius_meters": DEFAULT_GEOFENCE_RADIUS_METERS,
+            "is_active": 1
+        }]
+    else:
+        active_campuses = [c for c in campuses if c.get("is_active", 1)]
+
     if not active_campuses:
         return False, "No active campus location is configured. Please contact administrator.", {
             "geofence_enabled": True,
@@ -134,9 +168,9 @@ def verify_student_location(
     matched_campus = None
 
     for campus in active_campuses:
-        c_lat = campus["latitude"]
-        c_lon = campus["longitude"]
-        radius = float(campus.get("radius_meters", 30.0))
+        c_lat = float(campus.get("latitude", DEFAULT_CAMPUS_LAT))
+        c_lon = float(campus.get("longitude", DEFAULT_CAMPUS_LON))
+        radius = float(campus.get("radius_meters", DEFAULT_GEOFENCE_RADIUS_METERS))
 
         dist = haversine_distance(lat_f, lon_f, c_lat, c_lon)
         if dist < min_distance:
@@ -150,18 +184,19 @@ def verify_student_location(
             break
 
     if matched_campus:
-        return True, f"Location verified within {matched_campus['name']} area.", {
+        campus_name = matched_campus.get("name", DEFAULT_CAMPUS_NAME)
+        return True, f"Location verified within {campus_name} area.", {
             "geofence_enabled": True,
             "verified": True,
             "campus_id": matched_campus.get("id"),
-            "campus_name": matched_campus["name"],
+            "campus_name": campus_name,
             "distance_meters": round(min_distance, 2),
-            "allowed_radius_meters": float(matched_campus.get("radius_meters", 30.0)),
+            "allowed_radius_meters": float(matched_campus.get("radius_meters", DEFAULT_GEOFENCE_RADIUS_METERS)),
             "accuracy_meters": round(float(accuracy_meters), 1) if accuracy_meters is not None else None
         }
 
     # Outside radius
-    allowed_radius = float(closest_campus.get("radius_meters", 30.0)) if closest_campus else 30.0
+    allowed_radius = float(closest_campus.get("radius_meters", DEFAULT_GEOFENCE_RADIUS_METERS)) if closest_campus else DEFAULT_GEOFENCE_RADIUS_METERS
     return False, "Attendance is allowed only within the authorized college campus area.", {
         "geofence_enabled": True,
         "verified": False,
